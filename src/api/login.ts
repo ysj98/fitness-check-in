@@ -9,6 +9,17 @@ export interface ILoginForm {
   password: string
 }
 
+export interface IUserProfileUpdate {
+  nickname: string
+  avatarUrl?: string
+  gender?: string
+  birthday?: string
+}
+
+export interface IAvatarUploadRes {
+  avatarUrl: string
+}
+
 /**
  * 获取验证码
  * @returns ICaptcha 验证码
@@ -37,7 +48,7 @@ export function refreshToken(refreshToken: string) {
  * 获取用户信息
  */
 export function getUserInfo() {
-  return http.get<IUserInfoRes>('/user/info')
+  return http.get<IUserInfoRes>('/api/user/info')
 }
 
 /**
@@ -54,6 +65,38 @@ export function updateInfo(data: IUpdateInfo) {
   return http.post('/user/updateInfo', data)
 }
 
+export function updateUserProfile(data: IUserProfileUpdate) {
+  return http<IUserInfoRes>({
+    url: '/api/user/profile',
+    method: 'PATCH',
+    data,
+  })
+}
+
+export function uploadUserAvatar(filePath: string) {
+  return new Promise<IAvatarUploadRes>((resolve, reject) => {
+    uni.uploadFile({
+      url: '/api/user/avatar',
+      filePath,
+      name: 'avatar',
+      success: (res) => {
+        try {
+          const responseData = typeof res.data === 'string' ? JSON.parse(res.data) : res.data
+          if (res.statusCode >= 200 && res.statusCode < 300 && (responseData.code === 0 || responseData.code === 200)) {
+            resolve(responseData.data)
+            return
+          }
+          reject(new Error(responseData.message || responseData.msg || '头像上传失败'))
+        }
+        catch (error) {
+          reject(error)
+        }
+      },
+      fail: reject,
+    })
+  })
+}
+
 /**
  * 修改用户密码
  */
@@ -66,10 +109,17 @@ export function updateUserPassword(data: IUpdatePassword) {
  * @returns Promise 包含微信登录凭证(code)
  */
 export function getWxCode() {
-  return new Promise<UniApp.LoginRes>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     uni.login({
       provider: 'weixin',
-      success: res => resolve(res),
+      success: (res) => {
+        if (res.code) {
+          resolve(res.code)
+        }
+        else {
+          reject(new Error('未获取到微信登录凭证'))
+        }
+      },
       fail: err => reject(new Error(err)),
     })
   })
@@ -80,6 +130,6 @@ export function getWxCode() {
  * @param params 微信登录参数，包含code
  * @returns Promise 包含登录结果
  */
-export function wxLogin(data: { code: string }) {
-  return http.post<IAuthLoginRes>('/auth/wxLogin', data)
+export function wxLogin(code: string) {
+  return http.post<IAuthLoginRes>('/api/auth/wx-login', { code })
 }
