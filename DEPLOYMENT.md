@@ -72,40 +72,111 @@ cd fitness-check-in
 
 ## 4. 配置后端环境变量
 
-`docker-compose.yml` 会读取当前环境变量中的微信配置：
+后端启动前需要准备这些配置：
 
-```bash
-export WECHAT_APPID="你的微信小程序 AppID"
-export WECHAT_SECRET="你的微信小程序 AppSecret"
+| 变量 | 作用 |
+| --- | --- |
+| `WECHAT_APPID` | 微信小程序 AppID |
+| `WECHAT_SECRET` | 微信小程序 AppSecret |
+| `JWT_SECRET` | 登录 token 签名密钥 |
+| `MYSQL_DATABASE` | MySQL 数据库名 |
+| `MYSQL_USER` | MySQL 用户名 |
+| `MYSQL_PASSWORD` | MySQL 用户密码 |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 |
+| `PORT` | 后端服务端口 |
+| `HOST` | 后端监听地址 |
+
+微信配置获取位置：
+
+```text
+微信公众平台 -> 小程序后台 -> 开发管理 -> 开发设置 -> AppID / AppSecret
 ```
 
-更推荐在项目根目录创建 `.env`，方便 Docker Compose 自动读取：
-
-```bash
-WECHAT_APPID=你的微信小程序 AppID
-WECHAT_SECRET=你的微信小程序 AppSecret
-```
-
-生产环境还需要修改 `docker-compose.yml` 中的默认密钥和数据库密码：
-
-- `JWT_SECRET`
-- `MYSQL_PASSWORD`
-- `MYSQL_ROOT_PASSWORD`
-- `DATABASE_URL` 中的 MySQL 用户名、密码和库名
-
-生成随机 `JWT_SECRET`：
+生产环境建议先生成一个随机 `JWT_SECRET`：
 
 ```bash
 openssl rand -base64 48
 ```
 
-确认 `DATABASE_URL` 与 MySQL 配置一致，例如：
+### 4.1 使用 export 配置
 
-```text
-mysql://fitness:fitness_password@mysql:3306/fitness_check_in
+`export` 方式适合临时启动、调试和一次性部署。变量只在当前终端会话中生效。
+
+```bash
+export WECHAT_APPID="你的微信小程序 AppID"
+export WECHAT_SECRET="你的微信小程序 AppSecret"
+export JWT_SECRET="换成一串很长的随机字符串"
+export MYSQL_DATABASE="fitness_check_in"
+export MYSQL_USER="fitness"
+export MYSQL_PASSWORD="换成数据库用户密码"
+export MYSQL_ROOT_PASSWORD="换成数据库root密码"
+export PORT="3000"
+export HOST="0.0.0.0"
 ```
 
-这里的 `mysql` 是 Docker Compose service 名称，不要改成 `127.0.0.1`。
+在同一个终端里启动服务：
+
+```bash
+docker compose up -d --build
+```
+
+关闭终端或重新登录后，如果继续使用 `export` 方式，需要重新执行这些命令。
+
+### 4.2 使用根目录 .env 配置
+
+`.env` 方式适合长期部署。Docker Compose 会自动读取项目根目录的 `.env` 文件。
+
+在项目根目录创建 `.env`：
+
+```bash
+WECHAT_APPID=你的微信小程序 AppID
+WECHAT_SECRET=你的微信小程序 AppSecret
+JWT_SECRET=换成一串很长的随机字符串
+MYSQL_DATABASE=fitness_check_in
+MYSQL_USER=fitness
+MYSQL_PASSWORD=换成数据库用户密码
+MYSQL_ROOT_PASSWORD=换成数据库root密码
+PORT=3000
+HOST=0.0.0.0
+```
+
+启动服务：
+
+```bash
+docker compose up -d --build
+```
+
+`.env` 文件包含微信密钥、JWT 密钥和数据库密码，已经在 `.gitignore` 中忽略，不要提交到 Git。
+
+### 4.3 变量和 docker-compose.yml 的关系
+
+`docker-compose.yml` 会读取这些变量：
+
+```yaml
+MYSQL_DATABASE: ${MYSQL_DATABASE:-fitness_check_in}
+MYSQL_USER: ${MYSQL_USER:-fitness}
+MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fitness_password}
+MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+JWT_SECRET: ${JWT_SECRET:-change-this-long-random-secret}
+WECHAT_APPID: ${WECHAT_APPID:-}
+WECHAT_SECRET: ${WECHAT_SECRET:-}
+PORT: ${PORT:-3000}
+HOST: ${HOST:-0.0.0.0}
+```
+
+`DATABASE_URL` 由数据库用户名、密码和库名组成：
+
+```text
+mysql://MYSQL_USER:MYSQL_PASSWORD@mysql:3306/MYSQL_DATABASE
+```
+
+例如：
+
+```text
+mysql://fitness:数据库用户密码@mysql:3306/fitness_check_in
+```
+
+这里的 `mysql` 是 Docker Compose service 名称，部署在容器内时不要改成 `127.0.0.1`。
 
 ## 5. 启动后端和数据库
 
@@ -127,7 +198,17 @@ docker compose logs -f mysql
 curl http://127.0.0.1:3000/health
 ```
 
-正常响应应包含 `status: ok`。
+正常响应应包含：
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "status": "ok"
+  }
+}
+```
 
 头像上传文件保存在 API 容器内：
 
