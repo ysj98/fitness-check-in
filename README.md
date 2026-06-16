@@ -69,7 +69,19 @@ pnpm install
 docker compose up -d mysql
 ```
 
-### 3. 启动后端
+MySQL 默认暴露在本机：
+
+```text
+localhost:3306
+```
+
+默认数据库连接信息与 `server/.env.example` 保持一致：
+
+```text
+DATABASE_URL="mysql://fitness:fitness_password@localhost:3306/fitness_check_in"
+```
+
+### 3. 初始化并启动后端
 
 ```bash
 cd server
@@ -80,11 +92,30 @@ pnpm prisma:migrate
 pnpm dev
 ```
 
+如果已经存在 `server/.env`，确认至少包含：
+
+```bash
+DATABASE_URL="mysql://fitness:fitness_password@localhost:3306/fitness_check_in"
+JWT_SECRET="change-this-long-random-secret"
+WECHAT_APPID=""
+WECHAT_SECRET=""
+PORT=3000
+HOST="0.0.0.0"
+```
+
 后端默认启动在：
 
 ```text
 http://localhost:3000
 ```
+
+验证后端：
+
+```bash
+curl http://localhost:3000/health
+```
+
+本地调试微信登录时，需要在 `server/.env` 中填写微信小程序的 `WECHAT_APPID` 和 `WECHAT_SECRET`。如果只是调试非登录接口，可先保持为空。
 
 ### 4. 启动前端
 
