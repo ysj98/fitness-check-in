@@ -126,7 +126,13 @@ docker compose up -d --build
 
 `.env` 方式适合长期部署。Docker Compose 会自动读取项目根目录的 `.env` 文件。
 
-在项目根目录创建 `.env`：
+在项目根目录复制示例文件：
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`：
 
 ```bash
 WECHAT_APPID=你的微信小程序 AppID
