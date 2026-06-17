@@ -4,6 +4,7 @@ WORKDIR /app
 RUN corepack enable
 COPY package.json ./
 COPY prisma ./prisma
+RUN pnpm config set registry https://registry.npmmirror.com
 RUN pnpm install --frozen-lockfile=false
 
 FROM node:22-bookworm-slim AS build

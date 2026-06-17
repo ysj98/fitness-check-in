@@ -18,6 +18,8 @@ Docker Compose
   └─ mysql  MySQL 8.4
 ```
 
+本项目只将后端服务放入 Docker：`api` 和 `mysql` 两个容器。前端小程序不使用 Docker，仍通过微信开发者工具构建、上传和发布。
+
 推荐使用独立 API 域名，例如：
 
 ```text
@@ -85,6 +87,19 @@ cd fitness-check-in
 | `MYSQL_ROOT_PASSWORD` | MySQL root 密码 |
 | `PORT` | 后端服务端口 |
 | `HOST` | 后端监听地址 |
+| `NODE_OPTIONS` | Node.js 运行参数 |
+| `API_CPUS` | API 容器 CPU 上限 |
+| `API_MEMORY` | API 容器内存上限 |
+| `MYSQL_CPUS` | MySQL 容器 CPU 上限 |
+| `MYSQL_MEMORY` | MySQL 容器内存上限 |
+| `MYSQL_CONNECTION_LIMIT` | Prisma 到 MySQL 的连接池上限 |
+| `MYSQL_MAX_CONNECTIONS` | MySQL 最大连接数 |
+| `MYSQL_INNODB_BUFFER_POOL_SIZE` | MySQL InnoDB 缓冲池大小 |
+
+`MYSQL_PASSWORD` 和 `MYSQL_ROOT_PASSWORD` 都属于 Docker 容器中的 MySQL，不是服务器上已经安装的 MySQL 密码。
+
+- `MYSQL_PASSWORD`：业务用户 `MYSQL_USER` 的密码，后端 API 日常连接数据库使用。
+- `MYSQL_ROOT_PASSWORD`：MySQL 容器内 `root` 管理员密码，用于数据库维护。
 
 微信配置获取位置：
 
@@ -112,6 +127,14 @@ export MYSQL_PASSWORD="换成数据库用户密码"
 export MYSQL_ROOT_PASSWORD="换成数据库root密码"
 export PORT="3000"
 export HOST="0.0.0.0"
+export NODE_OPTIONS="--max-old-space-size=256"
+export API_CPUS="0.75"
+export API_MEMORY="384m"
+export MYSQL_CPUS="1.00"
+export MYSQL_MEMORY="768m"
+export MYSQL_CONNECTION_LIMIT="5"
+export MYSQL_MAX_CONNECTIONS="50"
+export MYSQL_INNODB_BUFFER_POOL_SIZE="256M"
 ```
 
 在同一个终端里启动服务：
@@ -144,6 +167,14 @@ MYSQL_PASSWORD=换成数据库用户密码
 MYSQL_ROOT_PASSWORD=换成数据库root密码
 PORT=3000
 HOST=0.0.0.0
+NODE_OPTIONS=--max-old-space-size=256
+API_CPUS=0.75
+API_MEMORY=384m
+MYSQL_CPUS=1.00
+MYSQL_MEMORY=768m
+MYSQL_CONNECTION_LIMIT=5
+MYSQL_MAX_CONNECTIONS=50
+MYSQL_INNODB_BUFFER_POOL_SIZE=256M
 ```
 
 启动服务：
@@ -168,21 +199,50 @@ WECHAT_APPID: ${WECHAT_APPID:-}
 WECHAT_SECRET: ${WECHAT_SECRET:-}
 PORT: ${PORT:-3000}
 HOST: ${HOST:-0.0.0.0}
+NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=256}
+API_CPUS: ${API_CPUS:-0.75}
+API_MEMORY: ${API_MEMORY:-384m}
+MYSQL_CPUS: ${MYSQL_CPUS:-1.00}
+MYSQL_MEMORY: ${MYSQL_MEMORY:-768m}
+MYSQL_CONNECTION_LIMIT: ${MYSQL_CONNECTION_LIMIT:-5}
+MYSQL_MAX_CONNECTIONS: ${MYSQL_MAX_CONNECTIONS:-50}
+MYSQL_INNODB_BUFFER_POOL_SIZE: ${MYSQL_INNODB_BUFFER_POOL_SIZE:-256M}
 ```
 
 `DATABASE_URL` 由数据库用户名、密码和库名组成：
 
 ```text
-mysql://MYSQL_USER:MYSQL_PASSWORD@mysql:3306/MYSQL_DATABASE
+mysql://MYSQL_USER:MYSQL_PASSWORD@mysql:3306/MYSQL_DATABASE?connection_limit=MYSQL_CONNECTION_LIMIT
 ```
 
 例如：
 
 ```text
-mysql://fitness:数据库用户密码@mysql:3306/fitness_check_in
+mysql://fitness:数据库用户密码@mysql:3306/fitness_check_in?connection_limit=5
 ```
 
 这里的 `mysql` 是 Docker Compose service 名称，部署在容器内时不要改成 `127.0.0.1`。
+
+### 4.4 2 核 2GiB 资源默认值
+
+当前默认值按阿里云 ECS 2 vCPU、2 GiB 内存设置：
+
+| 容器 | CPU 上限 | 内存上限 | 说明 |
+| --- | --- | --- | --- |
+| `api` | `0.75` | `384m` | Node.js API 服务 |
+| `mysql` | `1.00` | `768m` | MySQL 数据库 |
+
+默认运行策略：
+
+- API 只绑定 `127.0.0.1:3000`，公网访问交给 Nginx。
+- MySQL 不暴露宿主机 `3306`，只允许 `api` 容器通过 Compose 内部网络访问。
+- Node.js 堆内存限制为 `256MB`。
+- Prisma MySQL 连接池限制为 `5`。
+- MySQL 最大连接数限制为 `50`。
+- MySQL InnoDB 缓冲池限制为 `256MB`。
+- Docker 日志轮转为单文件 `10MB`，最多保留 `3` 个文件。
+
+如果 API 容器经常重启或日志出现内存不足，可将 `API_MEMORY` 调整为 `512m`。如果 MySQL 查询变慢且 `docker stats` 显示内存仍充足，可将 `MYSQL_INNODB_BUFFER_POOL_SIZE` 调整为 `384M`，并将 `MYSQL_MEMORY` 调整为 `1g`。
 
 ## 5. 启动后端和数据库
 
@@ -196,6 +256,12 @@ docker compose ps
 ```bash
 docker compose logs -f api
 docker compose logs -f mysql
+```
+
+查看资源占用：
+
+```bash
+docker stats
 ```
 
 验证本机 API：

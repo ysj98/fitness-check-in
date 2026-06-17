@@ -11,18 +11,28 @@ Node.js + Fastify + Prisma + MySQL。
 - Node.js >= 20
 - pnpm >= 9
 - Docker 和 Docker Compose
-- 本机 `3306` 端口未被其他 MySQL 占用
 
 ### 2. 启动本地 MySQL
 
-从项目根目录执行：
+根目录 `docker-compose.yml` 面向服务器部署，默认不把 MySQL `3306` 暴露到宿主机。
+
+如果本地后端使用 `pnpm dev` 运行，并希望连接容器里的 MySQL，可以在项目根目录临时创建 `docker-compose.override.yml`：
+
+```yaml
+services:
+  mysql:
+    ports:
+      - '127.0.0.1:3306:3306'
+```
+
+再从项目根目录执行：
 
 ```bash
 docker compose up -d mysql
 docker compose ps
 ```
 
-本地后端通过 `localhost:3306` 连接 MySQL。Docker Compose 中的默认连接信息是：
+本地后端通过 `localhost:3306` 连接 MySQL。默认连接信息是：
 
 ```text
 数据库：fitness_check_in
@@ -31,7 +41,7 @@ docker compose ps
 root 密码：root_password
 ```
 
-如果本机已经有 MySQL 占用 `3306`，可以停掉本机 MySQL，或修改根目录 `docker-compose.yml` 中的端口映射。
+生产部署不要开放 MySQL `3306` 到公网。
 
 ### 3. 配置环境变量
 

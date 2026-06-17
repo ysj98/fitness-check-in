@@ -8,10 +8,19 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fitness_password}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
       TZ: Asia/Shanghai
-    ports:
-      - '3306:3306'
+    command:
+      - --max-connections=${MYSQL_MAX_CONNECTIONS:-50}
+      - --innodb-buffer-pool-size=${MYSQL_INNODB_BUFFER_POOL_SIZE:-256M}
+      - --performance-schema=OFF
+    cpus: ${MYSQL_CPUS:-1.00}
+    mem_limit: ${MYSQL_MEMORY:-768m}
     volumes:
       - mysql_data:/var/lib/mysql
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
     healthcheck:
       test: [CMD, mysqladmin, ping, -h, localhost]
       interval: 10s
@@ -26,17 +35,25 @@ services:
       mysql:
         condition: service_healthy
     environment:
-      DATABASE_URL: mysql://${MYSQL_USER:-fitness}:${MYSQL_PASSWORD:-fitness_password}@mysql:3306/${MYSQL_DATABASE:-fitness_check_in}
+      DATABASE_URL: mysql://${MYSQL_USER:-fitness}:${MYSQL_PASSWORD:-fitness_password}@mysql:3306/${MYSQL_DATABASE:-fitness_check_in}?connection_limit=${MYSQL_CONNECTION_LIMIT:-5}
       JWT_SECRET: ${JWT_SECRET:-change-this-long-random-secret}
       WECHAT_APPID: ${WECHAT_APPID:-}
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       PORT: ${PORT:-3000}
       HOST: ${HOST:-0.0.0.0}
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=256}
       TZ: Asia/Shanghai
+    cpus: ${API_CPUS:-0.75}
+    mem_limit: ${API_MEMORY:-384m}
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     volumes:
       - uploads_data:/app/uploads
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
 
 volumes:
   mysql_data:

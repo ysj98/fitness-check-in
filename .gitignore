@@ -12,6 +12,7 @@ node_modules
 dist
 *.local
 .env
+docker-compose.override.yml
 
 # Editor directories and files
 .idea
