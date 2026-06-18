@@ -36,14 +36,15 @@ api.example.com
 
 ```bash
 sudo apt update
-sudo apt install -y git curl
+sudo apt install -y git curl unzip
 ```
 
 检查：
 
 ```bash
-git --version
 curl --version
+git --version
+unzip -v
 ```
 
 ### 2.2 安装 Node.js
@@ -105,14 +106,40 @@ sudo apt install -y certbot python3-certbot-nginx
 certbot --version
 ```
 
-## 3. 上传代码
+## 3. 生成并上传后端发布包
+
+在本地开发电脑执行：
 
 ```bash
-git clone <your-repo-url> fitness-check-in
-cd fitness-check-in
+cd server
+pnpm install
+pnpm build:release
+cd ..
 ```
 
-后续命令默认在项目根目录执行。
+发布包路径：
+
+```text
+server/release/fitness-check-in-server.zip
+```
+
+上传到服务器：
+
+```bash
+scp server/release/fitness-check-in-server.zip root@你的服务器IP:/opt/
+```
+
+登录服务器并解压：
+
+```bash
+ssh root@你的服务器IP
+mkdir -p /opt/fitness-check-in-server
+rm -rf /opt/fitness-check-in-server/dist /opt/fitness-check-in-server/prisma
+unzip -o /opt/fitness-check-in-server.zip -d /opt/fitness-check-in-server
+cd /opt/fitness-check-in-server
+```
+
+后续后端命令默认在 `/opt/fitness-check-in-server` 执行。
 
 ## 4. 初始化 MySQL
 
@@ -151,22 +178,22 @@ mysql -h 127.0.0.1 -u fitness -p fitness_check_in
 
 ## 5. 配置后端环境变量
 
-后端运行配置统一放在：
+后端运行配置统一放在发布目录：
 
 ```text
-server/.env
+.env
 ```
 
 复制示例文件：
 
 ```bash
-cp server/.env.example server/.env
+cp .env.example .env
 ```
 
 编辑：
 
 ```bash
-nano server/.env
+nano .env
 ```
 
 示例：
@@ -205,30 +232,22 @@ openssl rand -base64 48
 微信公众平台 -> 小程序后台 -> 开发管理 -> 开发设置 -> AppID / AppSecret
 ```
 
-## 6. 安装依赖、构建和迁移
-
-进入后端目录：
+## 6. 安装依赖和执行迁移
 
 ```bash
-cd server
-pnpm install --prod=false
+pnpm install
 pnpm prisma:generate
-pnpm build
 pnpm prisma:migrate
 ```
 
-回到项目根目录：
-
-```bash
-cd ..
-```
+这里使用完整 `pnpm install`，因为 `prisma migrate deploy` 需要项目中的 Prisma CLI。发布目录已经包含本地编译好的 `dist/`，服务器上不要再执行 `pnpm build`。
 
 ## 7. 使用 PM2 启动后端
 
 启动：
 
 ```bash
-pm2 start server/ecosystem.config.cjs --env production
+pm2 start ecosystem.config.cjs --env production
 ```
 
 查看状态：
@@ -381,26 +400,29 @@ dist/build/mp-weixin
 
 上传代码后在微信公众平台提交审核。
 
-## 12. 更新发布
-
-拉取代码：
-
-```bash
-git pull
-```
-
-更新后端：
+在本地开发电脑重新生成发布包：
 
 ```bash
 cd server
-pnpm install --prod=false
-pnpm prisma:generate
-pnpm build
-pnpm prisma:migrate
+pnpm build:release
 cd ..
+scp server/release/fitness-check-in-server.zip root@你的服务器IP:/opt/
+```
+
+在服务器更新后端：
+
+```bash
+cd /opt/fitness-check-in-server
+rm -rf dist prisma
+unzip -o /opt/fitness-check-in-server.zip -d /opt/fitness-check-in-server
+pnpm install
+pnpm prisma:generate
+pnpm prisma:migrate
 pm2 restart fitness-check-in-api --update-env
 pm2 save
 ```
+
+更新发布时同样不要在服务器上执行 `pnpm build`。
 
 查看状态：
 
@@ -456,7 +478,7 @@ mysql -h 127.0.0.1 -u fitness -p fitness_check_in < fitness_check_in.sql
 头像文件目录：
 
 ```text
-server/uploads/avatars
+/opt/fitness-check-in-server/uploads/avatars
 ```
 
 ## 14. 排查
@@ -469,7 +491,7 @@ pm2 logs fitness-check-in-api --lines 100
 curl http://127.0.0.1:3000/health
 ```
 
-检查 `server/.env` 中的 `DATABASE_URL`、`JWT_SECRET`、`WECHAT_APPID`、`WECHAT_SECRET`。
+检查 `.env` 中的 `DATABASE_URL`、`JWT_SECRET`、`WECHAT_APPID`、`WECHAT_SECRET`。
 
 ### 数据库连接失败
 

@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "clean:dist": "node scripts/clean-dist.cjs",
+    "build": "pnpm clean:dist && tsc -p tsconfig.build.json",
+    "build:release": "node scripts/build-release.cjs",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",

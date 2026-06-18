@@ -102,6 +102,50 @@ pm2 stop fitness-check-in-api
 pm2 save
 ```
 
+## 发布包
+
+本地生成后端发布包：
+
+```bash
+pnpm build:release
+```
+
+发布包路径：
+
+```text
+server/release/fitness-check-in-server.zip
+```
+
+发布包包含：
+
+- `dist/`
+- `prisma/`
+- `package.json`
+- `pnpm-lock.yaml`
+- `pnpm-workspace.yaml`
+- `ecosystem.config.cjs`
+- `.env.example`
+
+发布包不包含：
+
+- `src/`
+- `node_modules/`
+- `.env`
+- 测试文件
+- 上传头像目录
+
+服务器解压发布包后执行：
+
+```bash
+cp .env.example .env
+pnpm install
+pnpm prisma:generate
+pnpm prisma:migrate
+pm2 start ecosystem.config.cjs --env production
+```
+
+先编辑 `.env`，再启动服务。这里使用完整 `pnpm install`，因为迁移命令需要 Prisma CLI。
+
 ## API
 
 - `GET /health`
@@ -144,6 +188,7 @@ server/uploads/avatars
 ```bash
 pnpm test
 pnpm build
+pnpm build:release
 ```
 
 ## 常见问题
