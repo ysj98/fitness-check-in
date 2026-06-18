@@ -146,18 +146,6 @@ async function handleSave() {
         >
       </view>
 
-      <view class="field">
-        <text class="field-label">
-          头像地址
-        </text>
-        <input
-          v-model="form.avatarUrl"
-          class="field-input"
-          placeholder="https://..."
-          placeholder-class="placeholder"
-        >
-      </view>
-
       <picker :value="genderIndex" :range="genderOptions" range-key="label" @change="handleGenderChange">
         <view class="field picker-field">
           <text class="field-label">

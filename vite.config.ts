@@ -30,6 +30,7 @@ import ViteRestart from 'vite-plugin-restart'
 import openDevTools from './scripts/open-dev-tools'
 import vitePluginEruda from './scripts/vite-plugin-eruda'
 import { createCopyNativeResourcesPlugin } from './vite-plugins/copy-native-resources'
+import { removeMpWeixinBrokenPreloadAssetsPlugin } from './vite-plugins/remove-mp-weixin-broken-preload-assets'
 import syncManifestPlugin from './vite-plugins/sync-manifest-plugins'
 
 // https://vitejs.dev/config/
@@ -153,6 +154,7 @@ export default defineConfig(({ command, mode }) => {
         },
       ),
       syncManifestPlugin(),
+      removeMpWeixinBrokenPreloadAssetsPlugin(UNI_PLATFORM === 'mp-weixin'),
       vitePluginEruda({
         open: UNI_PLATFORM === 'h5' && mode === 'development',
       }),
