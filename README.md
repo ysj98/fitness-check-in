@@ -1,6 +1,6 @@
 # 运动打卡小程序
 
-微信小程序运动打卡应用，包含小程序前端、后端 API、MySQL 数据库和 Docker 部署配置。
+微信小程序运动打卡应用，包含小程序前端、后端 API、MySQL 数据库和 PM2 部署配置。
 
 ## 项目功能
 
@@ -67,7 +67,7 @@
 
 - 前端：uni-app、Vue 3、TypeScript、UnoCSS
 - 后端：Node.js、Fastify、Prisma、MySQL
-- 部署：Docker Compose、Nginx、Certbot
+- 部署：PM2、Nginx、Certbot
 
 ## 目录
 
@@ -76,7 +76,6 @@
 ├─ src/                 小程序前端
 ├─ server/              后端 API
 ├─ env/                 前端环境变量
-├─ docker-compose.yml   后端和 MySQL 编排
 ├─ DEPLOYMENT.md        服务器部署文档
 └─ README.md            项目功能说明
 ```
