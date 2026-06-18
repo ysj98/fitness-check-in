@@ -28,6 +28,7 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[] } 
             avatarUrl: null,
             gender: null,
             birthday: null,
+            dailyGoal: args.create.dailyGoal || 1,
           }
           users.push(user)
         }
@@ -155,6 +156,7 @@ describe('fitness check-in api', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json().data.token).toBeTruthy()
     expect(response.json().data.user.openid).toBe('openid-abc')
+    expect(response.json().data.user.dailyGoal).toBe(1)
   })
 
   it('creates check-ins and returns today summary', async () => {
@@ -311,12 +313,74 @@ describe('fitness check-in api', () => {
         avatarUrl: 'https://example.com/avatar.png',
         gender: 'other',
         birthday: '1995-05-20',
+        dailyGoal: 3,
       },
     })
 
     expect(response.json().data.nickname).toBe('Alex')
     expect(response.json().data.gender).toBe('other')
     expect(response.json().data.birthday).toBe('1995-05-20')
+    expect(response.json().data.dailyGoal).toBe(3)
+  })
+
+  it('rejects invalid daily goal', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: { authorization: `Bearer ${session.token}` },
+      payload: {
+        nickname: 'Alex',
+        dailyGoal: 10,
+      },
+    })
+
+    expect(response.statusCode).toBe(400)
+    expect(response.json().message).toContain('dailyGoal')
+  })
+
+  it('returns goal progress and badges in stats', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: { authorization: `Bearer ${session.token}` },
+      payload: {
+        nickname: 'Alex',
+        dailyGoal: 2,
+      },
+    })
+    db.checkIns.push(
+      checkInAtChinaDay(session.user.id, 0, 1),
+      checkInAtChinaDay(session.user.id, 0, 2),
+      checkInAtChinaDay(session.user.id, 1, 3),
+      checkInAtChinaDay(session.user.id, 2, 4),
+    )
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/checkins/stats',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+    const data = response.json().data
+
+    expect(data.totalCount).toBe(4)
+    expect(data.todayGoal).toBe(2)
+    expect(data.todayCompleted).toBe(true)
+    expect(data.badges.find((badge: { key: string }) => badge.key === 'streak_3').unlocked).toBe(true)
+    expect(data.badges.find((badge: { key: string }) => badge.key === 'daily_goal').unlocked).toBe(true)
   })
 
   it('rejects avatar upload without login', async () => {
@@ -369,6 +433,7 @@ describe('fitness check-in api', () => {
         avatarUrl,
         gender: 'other',
         birthday: '1995-05-20',
+        dailyGoal: 1,
       },
     })
 

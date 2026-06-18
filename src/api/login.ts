@@ -14,6 +14,7 @@ export interface IUserProfileUpdate {
   avatarUrl?: string
   gender?: string
   birthday?: string
+  dailyGoal?: number
 }
 
 export interface IAvatarUploadRes {
@@ -68,7 +69,7 @@ export function updateInfo(data: IUpdateInfo) {
 export function updateUserProfile(data: IUserProfileUpdate) {
   return http<IUserInfoRes>({
     url: '/api/user/profile',
-    method: 'PATCH',
+    method: 'PATCH' as UniApp.RequestOptions['method'],
     data,
   })
 }

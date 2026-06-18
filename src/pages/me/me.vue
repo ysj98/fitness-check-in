@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { CheckInBadge } from '@/api/checkins'
+import { getCheckInStats } from '@/api/checkins'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
 import { useTokenStore, useUserStore } from '@/store'
 
@@ -15,17 +17,20 @@ const userStore = useUserStore()
 const saving = ref(false)
 const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
+const badges = ref<CheckInBadge[]>([])
 const genderOptions = [
   { label: '未设置', value: '' },
   { label: '男', value: 'male' },
   { label: '女', value: 'female' },
   { label: '其他', value: 'other' },
 ]
+const dailyGoalOptions = Array.from({ length: 9 }, (_, index) => `${index + 1}`)
 const form = reactive({
   nickname: '',
   avatarUrl: '',
   gender: '',
   birthday: '',
+  dailyGoal: 1,
 })
 
 const avatarPreview = computed(() => avatarTempUrl.value || form.avatarUrl || '/static/images/default-avatar.png')
@@ -34,6 +39,8 @@ const genderIndex = computed(() => {
   return index >= 0 ? index : 0
 })
 const genderLabel = computed(() => genderOptions[genderIndex.value].label)
+const dailyGoalIndex = computed(() => Math.max(0, Math.min(8, form.dailyGoal - 1)))
+const unlockedBadgeCount = computed(() => badges.value.filter(item => item.unlocked).length)
 
 onShow(() => {
   initProfile()
@@ -43,11 +50,16 @@ async function initProfile() {
   if (!tokenStore.updateNowTime().hasLogin) {
     await tokenStore.wxLogin()
   }
-  const userInfo = await userStore.fetchUserInfo()
+  const [userInfo, stats] = await Promise.all([
+    userStore.fetchUserInfo(),
+    getCheckInStats(),
+  ])
   form.nickname = userInfo.nickname || ''
   form.avatarUrl = userInfo.avatarUrl || userInfo.avatar || ''
   form.gender = userInfo.gender || ''
   form.birthday = userInfo.birthday || ''
+  form.dailyGoal = userInfo.dailyGoal || 1
+  badges.value = stats.badges
 }
 
 function handleGenderChange(event: { detail: { value: number } }) {
@@ -56,6 +68,10 @@ function handleGenderChange(event: { detail: { value: number } }) {
 
 function handleBirthdayChange(event: { detail: { value: string } }) {
   form.birthday = event.detail.value
+}
+
+function handleDailyGoalChange(event: { detail: { value: number } }) {
+  form.dailyGoal = Number(dailyGoalOptions[event.detail.value] || 1)
 }
 
 async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
@@ -96,6 +112,7 @@ async function handleSave() {
       avatarUrl: form.avatarUrl.trim(),
       gender: form.gender,
       birthday: form.birthday,
+      dailyGoal: form.dailyGoal,
     })
     userStore.setUserInfo(userInfo)
     uni.showToast({
@@ -140,7 +157,7 @@ async function handleSave() {
           v-model="form.nickname"
           class="field-input"
           type="nickname"
-          maxlength="30"
+          :maxlength="30"
           placeholder="请输入昵称"
           placeholder-class="placeholder"
         >
@@ -167,6 +184,46 @@ async function handleSave() {
           </view>
         </view>
       </picker>
+
+      <picker :value="dailyGoalIndex" :range="dailyGoalOptions" @change="handleDailyGoalChange">
+        <view class="field picker-field">
+          <text class="field-label">
+            每日目标
+          </text>
+          <view class="field-value">
+            {{ form.dailyGoal }} 次
+          </view>
+        </view>
+      </picker>
+    </view>
+
+    <view class="achievement-section">
+      <view class="achievement-head">
+        <text class="achievement-title">
+          我的成就
+        </text>
+        <text class="achievement-count">
+          {{ unlockedBadgeCount }}/{{ badges.length }}
+        </text>
+      </view>
+      <view class="badge-grid">
+        <view
+          v-for="badge in badges"
+          :key="badge.key"
+          class="badge-item"
+          :class="{ unlocked: badge.unlocked }"
+        >
+          <view class="badge-mark">
+            {{ badge.unlocked ? '已达成' : '未达成' }}
+          </view>
+          <view class="badge-name">
+            {{ badge.name }}
+          </view>
+          <view class="badge-desc">
+            {{ badge.description }}
+          </view>
+        </view>
+      </view>
     </view>
 
     <button
@@ -302,6 +359,92 @@ async function handleSave() {
 
 .picker-field {
   min-height: 104rpx;
+}
+
+.achievement-section {
+  margin-top: 28rpx;
+  padding: 28rpx;
+  border: 1px solid #e2e8f0;
+  border-radius: 16rpx;
+  background: #ffffff;
+}
+
+.achievement-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-bottom: 22rpx;
+}
+
+.achievement-title {
+  color: #0f172a;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.achievement-count {
+  min-width: 86rpx;
+  height: 44rpx;
+  border-radius: 999rpx;
+  color: #047857;
+  background: #d1fae5;
+  font-size: 24rpx;
+  line-height: 44rpx;
+  text-align: center;
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+}
+
+.badge-item {
+  min-height: 142rpx;
+  padding: 18rpx;
+  border: 1px solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #f8fafc;
+  box-sizing: border-box;
+  opacity: 0.68;
+}
+
+.badge-item.unlocked {
+  border-color: #86efac;
+  background: #ecfdf5;
+  opacity: 1;
+  box-shadow: 0 12rpx 24rpx rgba(15, 118, 110, 0.08);
+}
+
+.badge-mark {
+  display: inline-block;
+  height: 34rpx;
+  padding: 0 12rpx;
+  border-radius: 999rpx;
+  color: #64748b;
+  background: #e2e8f0;
+  font-size: 20rpx;
+  line-height: 34rpx;
+}
+
+.badge-item.unlocked .badge-mark {
+  color: #ffffff;
+  background: #059669;
+}
+
+.badge-name {
+  margin-top: 14rpx;
+  color: #0f172a;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.badge-desc {
+  margin-top: 6rpx;
+  color: #64748b;
+  font-size: 22rpx;
+  line-height: 1.4;
 }
 
 .save-button {

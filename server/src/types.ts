@@ -5,6 +5,7 @@ export interface AppUser {
   avatarUrl: string | null
   gender?: string | null
   birthday?: string | null
+  dailyGoal: number
   createdAt?: Date
   updatedAt?: Date
 }

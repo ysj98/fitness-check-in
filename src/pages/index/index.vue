@@ -30,6 +30,10 @@ const emptyStats: CheckInStatsRes = {
   activeDays: 0,
   currentStreak: 0,
   weekDays: [],
+  totalCount: 0,
+  todayGoal: 1,
+  todayCompleted: false,
+  badges: [],
 }
 
 const tokenStore = useTokenStore()
@@ -80,6 +84,18 @@ const heroHint = computed(() => {
     return `连续 ${checkInStats.value.currentStreak} 天`
   }
   return '今日打卡'
+})
+
+const goalPercent = computed(() => {
+  const goal = Math.max(checkInStats.value.todayGoal || 1, 1)
+  return Math.min(100, Math.round((todayCount.value / goal) * 100))
+})
+
+const goalText = computed(() => {
+  if (checkInStats.value.todayCompleted) {
+    return '今日目标已完成'
+  }
+  return `还差 ${Math.max((checkInStats.value.todayGoal || 1) - todayCount.value, 0)} 次达成`
 })
 
 onLoad(() => {
@@ -168,7 +184,7 @@ async function handleCheckIn() {
     monthStats.value = month
     checkInStats.value = stats
     uni.showToast({
-      title: '打卡成功',
+      title: stats.todayCompleted ? '今日目标达成' : '打卡成功',
       icon: 'success',
     })
   }
@@ -261,6 +277,25 @@ function formatRecordDate(value: string) {
         </text>
       </button>
       <view v-if="successPulse" class="success-ring" />
+    </view>
+
+    <view class="goal-card" :class="{ completed: checkInStats.todayCompleted, pulse: successPulse && checkInStats.todayCompleted }">
+      <view class="goal-head">
+        <view>
+          <text class="goal-title">
+            今日目标
+          </text>
+          <text class="goal-status">
+            {{ goalText }}
+          </text>
+        </view>
+        <view class="goal-count">
+          {{ todayCount }}/{{ checkInStats.todayGoal || 1 }}
+        </view>
+      </view>
+      <view class="goal-track">
+        <view class="goal-progress" :style="{ width: `${goalPercent}%` }" />
+      </view>
     </view>
 
     <view class="section">
@@ -362,6 +397,7 @@ function formatRecordDate(value: string) {
 
 .hero,
 .action-section,
+.goal-card,
 .section {
   opacity: 0;
   transform: translateY(18rpx);
@@ -375,8 +411,12 @@ function formatRecordDate(value: string) {
   animation: page-enter 260ms ease-out 45ms both;
 }
 
+.ready .goal-card {
+  animation: page-enter 260ms ease-out 75ms both;
+}
+
 .ready .section {
-  animation: page-enter 260ms ease-out 90ms both;
+  animation: page-enter 260ms ease-out 115ms both;
 }
 
 .ready .section:nth-of-type(4) {
@@ -474,6 +514,9 @@ function formatRecordDate(value: string) {
 
 .checkin-button::after {
   border: 0;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0));
+  pointer-events: none;
 }
 
 .checkin-button::before {
@@ -520,6 +563,80 @@ function formatRecordDate(value: string) {
   border-radius: 50%;
   background: rgba(16, 185, 129, 0.18);
   animation: ring-spread 340ms ease-out forwards;
+}
+
+.goal-card {
+  margin-bottom: 24rpx;
+  padding: 26rpx;
+  border: 1px solid #bbf7d0;
+  border-radius: 16rpx;
+  background: rgba(240, 253, 244, 0.95);
+  box-shadow: 0 18rpx 36rpx rgba(15, 118, 110, 0.08);
+  transition:
+    transform 200ms ease-out,
+    border-color 200ms ease-out,
+    background 200ms ease-out;
+}
+
+.goal-card.completed {
+  border-color: #34d399;
+  background: #ecfdf5;
+}
+
+.goal-card.pulse {
+  animation: goal-complete 320ms ease-out both;
+}
+
+.goal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.goal-title,
+.goal-status {
+  display: block;
+}
+
+.goal-title {
+  color: #064e3b;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.goal-status {
+  margin-top: 8rpx;
+  color: #047857;
+  font-size: 24rpx;
+}
+
+.goal-count {
+  flex: 0 0 auto;
+  min-width: 112rpx;
+  height: 64rpx;
+  border-radius: 999rpx;
+  color: #ffffff;
+  background: #059669;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 64rpx;
+  text-align: center;
+}
+
+.goal-track {
+  height: 16rpx;
+  margin-top: 22rpx;
+  border-radius: 999rpx;
+  background: #d1fae5;
+  overflow: hidden;
+}
+
+.goal-progress {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #10b981, #0f766e);
+  transition: width 260ms ease-out;
 }
 
 .section {
@@ -693,11 +810,11 @@ function formatRecordDate(value: string) {
 @keyframes breathe {
   0%,
   100% {
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 
   50% {
-    transform: scale(1.025);
+    transform: translateY(-3rpx) scale(1.02);
   }
 }
 
@@ -727,11 +844,25 @@ function formatRecordDate(value: string) {
 
 @keyframes success-pop {
   0% {
-    transform: scale(0.96);
+    transform: translateY(10rpx) scale(0.96);
   }
 
   70% {
-    transform: scale(1.04);
+    transform: translateY(-5rpx) scale(1.04);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes goal-complete {
+  0% {
+    transform: scale(0.98);
+  }
+
+  70% {
+    transform: scale(1.025);
   }
 
   100% {

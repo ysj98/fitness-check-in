@@ -33,6 +33,7 @@ export interface IUserInfoRes {
   avatarUrl?: string
   gender?: string
   birthday?: string
+  dailyGoal?: number
   /** 同时支持单角色和多角色，你自行选择一种就行 */
   role?: UserRole
   roles?: UserRole[]

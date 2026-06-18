@@ -20,6 +20,13 @@ export interface WeekDayStat {
   count: number
 }
 
+export interface CheckInBadge {
+  key: string
+  name: string
+  description: string
+  unlocked: boolean
+}
+
 export interface CheckInStatsRes {
   weekStart: string
   weekEnd: string
@@ -27,6 +34,10 @@ export interface CheckInStatsRes {
   activeDays: number
   currentStreak: number
   weekDays: WeekDayStat[]
+  totalCount: number
+  todayGoal: number
+  todayCompleted: boolean
+  badges: CheckInBadge[]
 }
 
 export function getTodayCheckIns() {

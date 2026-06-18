@@ -9,7 +9,7 @@ import process from 'node:process'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import Fastify from 'fastify'
-import { z } from 'zod'
+import { z, ZodError } from 'zod'
 import { addChinaDays, formatChinaDate, getChinaDayRange, getChinaMonthRange, getChinaWeekRange } from './date.js'
 import { exchangeWeChatCode } from './wechat.js'
 
@@ -49,6 +49,7 @@ const profileSchema = z.object({
   avatarUrl: z.string().trim().max(500).optional().nullable(),
   gender: z.enum(['male', 'female', 'other']).optional().nullable(),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  dailyGoal: z.coerce.number().int().min(1).max(9).optional(),
 })
 
 function ok<T>(data: T, message = 'ok') {
@@ -57,6 +58,49 @@ function ok<T>(data: T, message = 'ok') {
 
 function fail(message: string, code = 400) {
   return { code, data: null, message, msg: message }
+}
+
+function buildBadges(params: { currentStreak: number, totalCount: number, todayCompleted: boolean }) {
+  const { currentStreak, totalCount, todayCompleted } = params
+
+  return [
+    {
+      key: 'first_checkin',
+      name: '初次打卡',
+      description: '完成第 1 次打卡',
+      unlocked: totalCount >= 1,
+    },
+    {
+      key: 'streak_3',
+      name: '连续 3 天',
+      description: '连续打卡 3 天',
+      unlocked: currentStreak >= 3,
+    },
+    {
+      key: 'streak_7',
+      name: '连续 7 天',
+      description: '连续打卡 7 天',
+      unlocked: currentStreak >= 7,
+    },
+    {
+      key: 'total_10',
+      name: '累计 10 次',
+      description: '累计打卡 10 次',
+      unlocked: totalCount >= 10,
+    },
+    {
+      key: 'total_30',
+      name: '累计 30 次',
+      description: '累计打卡 30 次',
+      unlocked: totalCount >= 30,
+    },
+    {
+      key: 'daily_goal',
+      name: '今日达标',
+      description: '完成今日目标',
+      unlocked: todayCompleted,
+    },
+  ]
 }
 
 function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
@@ -72,6 +116,7 @@ function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
     avatarUrl: user.avatarUrl || '',
     gender: user.gender || '',
     birthday: user.birthday || '',
+    dailyGoal: user.dailyGoal || 1,
     role: 'user',
     roles: ['user'],
   }
@@ -217,7 +262,7 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.setErrorHandler((error, _request, reply) => {
-    const statusCode = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500
+    const statusCode = error instanceof ZodError ? 400 : error.statusCode && error.statusCode >= 400 ? error.statusCode : 500
     reply.code(statusCode).send(fail(error.message || 'Server error', statusCode))
   })
 
@@ -237,6 +282,7 @@ export async function createApp(options: CreateAppOptions) {
       update: {},
       create: {
         openid: wxSession.openid,
+        dailyGoal: 1,
         nickname: '运动达人',
       },
     })
@@ -252,6 +298,7 @@ export async function createApp(options: CreateAppOptions) {
         avatarUrl: user.avatarUrl,
         gender: user.gender,
         birthday: user.birthday,
+        dailyGoal: user.dailyGoal || 1,
       },
     }))
   })
@@ -278,6 +325,7 @@ export async function createApp(options: CreateAppOptions) {
         avatarUrl: body.avatarUrl || null,
         gender: body.gender || null,
         birthday: body.birthday || null,
+        ...(body.dailyGoal ? { dailyGoal: body.dailyGoal } : {}),
       },
     })
 
@@ -383,17 +431,32 @@ export async function createApp(options: CreateAppOptions) {
 
   app.get('/api/checkins/stats', async (request) => {
     const { start, end } = getChinaWeekRange()
-    const weekRecords = await app.db.checkIn.findMany({
-      where: {
-        userId: request.user.userId,
-        checkedAt: { gte: start, lt: end },
-      },
-      orderBy: { checkedAt: 'asc' },
-    })
-    const allRecords = await app.db.checkIn.findMany({
-      where: { userId: request.user.userId },
-      orderBy: { checkedAt: 'desc' },
-    })
+    const todayRange = getChinaDayRange()
+    const [weekRecords, allRecords, todayCount, user] = await Promise.all([
+      app.db.checkIn.findMany({
+        where: {
+          userId: request.user.userId,
+          checkedAt: { gte: start, lt: end },
+        },
+        orderBy: { checkedAt: 'asc' },
+      }),
+      app.db.checkIn.findMany({
+        where: { userId: request.user.userId },
+        orderBy: { checkedAt: 'desc' },
+      }),
+      app.db.checkIn.count({
+        where: {
+          userId: request.user.userId,
+          checkedAt: { gte: todayRange.start, lt: todayRange.end },
+        },
+      }),
+      app.db.user.findUnique({ where: { id: request.user.userId } }),
+    ])
+    if (!user) {
+      const error = new Error('User not found') as Error & { statusCode: number }
+      error.statusCode = 401
+      throw error
+    }
     const weekCounts = weekRecords.reduce<Record<string, number>>((result, record) => {
       const key = formatChinaDate(record.checkedAt)
       result[key] = (result[key] || 0) + 1
@@ -414,6 +477,9 @@ export async function createApp(options: CreateAppOptions) {
       currentStreak += 1
       cursor = addChinaDays(cursor, -1)
     }
+    const totalCount = allRecords.length
+    const todayGoal = user.dailyGoal || 1
+    const todayCompleted = todayCount >= todayGoal
 
     return ok({
       weekStart: formatChinaDate(start),
@@ -422,6 +488,10 @@ export async function createApp(options: CreateAppOptions) {
       activeDays: weekDays.filter(day => day.count > 0).length,
       currentStreak,
       weekDays,
+      totalCount,
+      todayGoal,
+      todayCompleted,
+      badges: buildBadges({ currentStreak, totalCount, todayCompleted }),
     })
   })
 
