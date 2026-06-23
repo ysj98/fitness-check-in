@@ -44,12 +44,36 @@ const recentQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+const weightValueSchema = z.coerce.number().min(20).max(300)
+const heightValueSchema = z.coerce.number().min(100).max(250)
+
+const weightRecordSchema = z.object({
+  weightKg: weightValueSchema,
+  measuredAt: z.string().datetime(),
+})
+
+const weightListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})
+
+const weightStatsQuerySchema = z.object({
+  days: z.coerce.number().refine(value => [7, 30, 90].includes(value), 'days must be 7, 30 or 90'),
+})
+
+const weightSettingsSchema = z.object({
+  heightCm: heightValueSchema.optional().nullable(),
+  targetWeightKg: weightValueSchema.optional().nullable(),
+  weightUnit: z.enum(['kg', 'jin']).optional(),
+})
+
 const profileSchema = z.object({
   nickname: z.string().trim().min(1).max(30),
   avatarUrl: z.string().trim().max(500).optional().nullable(),
   gender: z.enum(['male', 'female', 'other']).optional().nullable(),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   dailyGoal: z.coerce.number().int().min(1).max(9).optional(),
+  heightCm: heightValueSchema.optional().nullable(),
 })
 
 function ok<T>(data: T, message = 'ok') {
@@ -58,6 +82,76 @@ function ok<T>(data: T, message = 'ok') {
 
 function fail(message: string, code = 400) {
   return { code, data: null, message, msg: message }
+}
+
+function toNumber(value: number | string | null | undefined) {
+  return value === null || value === undefined ? null : Number(value)
+}
+
+function round(value: number, digits = 2) {
+  const factor = 10 ** digits
+  return Math.round((value + Number.EPSILON) * factor) / factor
+}
+
+function calculateRawBmi(weightKg: number, heightCm: number | null) {
+  if (!heightCm) {
+    return null
+  }
+  return weightKg / ((heightCm / 100) ** 2)
+}
+
+function calculateBmi(weightKg: number, heightCm: number | null) {
+  const bmi = calculateRawBmi(weightKg, heightCm)
+  return bmi === null ? null : round(bmi, 1)
+}
+
+function getBmiCategory(bmi: number | null) {
+  if (bmi === null) {
+    return null
+  }
+  if (bmi < 18.5) {
+    return 'underweight'
+  }
+  if (bmi < 24) {
+    return 'normal'
+  }
+  if (bmi < 28) {
+    return 'overweight'
+  }
+  return 'obese'
+}
+
+function getBmiLabel(category: ReturnType<typeof getBmiCategory>) {
+  const labels = {
+    underweight: '偏低',
+    normal: '正常',
+    overweight: '超重',
+    obese: '肥胖',
+  }
+  return category ? labels[category] : ''
+}
+
+function parseMeasuredAt(value: string) {
+  const measuredAt = new Date(value)
+  if (measuredAt.getTime() > Date.now() + 60 * 1000) {
+    const error = new Error('测量时间不能晚于当前时间') as Error & { statusCode: number }
+    error.statusCode = 400
+    throw error
+  }
+  return measuredAt
+}
+
+function serializeWeightRecord(record: Awaited<ReturnType<AppDb['weightRecord']['findFirst']>>, heightCm: number | null) {
+  if (!record) {
+    return null
+  }
+  const weightKg = Number(record.weightKg)
+  return {
+    id: record.id,
+    weightKg,
+    bmi: calculateBmi(weightKg, heightCm),
+    measuredAt: record.measuredAt.toISOString(),
+  }
 }
 
 function buildBadges(params: { currentStreak: number, totalCount: number, todayCompleted: boolean }) {
@@ -117,6 +211,9 @@ function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
     gender: user.gender || '',
     birthday: user.birthday || '',
     dailyGoal: user.dailyGoal || 1,
+    heightCm: toNumber(user.heightCm),
+    targetWeightKg: toNumber(user.targetWeightKg),
+    weightUnit: user.weightUnit || 'kg',
     role: 'user',
     roles: ['user'],
   }
@@ -299,6 +396,9 @@ export async function createApp(options: CreateAppOptions) {
         gender: user.gender,
         birthday: user.birthday,
         dailyGoal: user.dailyGoal || 1,
+        heightCm: toNumber(user.heightCm),
+        targetWeightKg: toNumber(user.targetWeightKg),
+        weightUnit: user.weightUnit || 'kg',
       },
     }))
   })
@@ -326,10 +426,26 @@ export async function createApp(options: CreateAppOptions) {
         gender: body.gender || null,
         birthday: body.birthday || null,
         ...(body.dailyGoal ? { dailyGoal: body.dailyGoal } : {}),
+        ...(body.heightCm !== undefined ? { heightCm: body.heightCm } : {}),
       },
     })
 
     return ok(serializeUser(user), '保存成功')
+  })
+
+  app.patch('/api/user/weight-settings', async (request) => {
+    await requireAuth(app, request)
+    const body = weightSettingsSchema.parse(request.body)
+    const user = await app.db.user.update({
+      where: { id: request.user.userId },
+      data: {
+        ...(body.heightCm !== undefined ? { heightCm: body.heightCm } : {}),
+        ...(body.targetWeightKg !== undefined ? { targetWeightKg: body.targetWeightKg } : {}),
+        ...(body.weightUnit ? { weightUnit: body.weightUnit } : {}),
+      },
+    })
+
+    return ok(serializeUser(user), '设置已保存')
   })
 
   app.post('/api/user/avatar', async (request) => {
@@ -353,9 +469,146 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.addHook('preHandler', async (request) => {
-    if (request.routeOptions.url?.startsWith('/api/checkins')) {
+    if (request.routeOptions.url?.startsWith('/api/checkins') || request.routeOptions.url?.startsWith('/api/weights')) {
       await requireAuth(app, request)
     }
+  })
+
+  app.get('/api/weights', async (request) => {
+    const query = weightListQuerySchema.parse(request.query)
+    const user = await app.db.user.findUnique({ where: { id: request.user.userId } })
+    const heightCm = toNumber(user?.heightCm)
+    const where = { userId: request.user.userId }
+    const [total, records] = await Promise.all([
+      app.db.weightRecord.count({ where }),
+      app.db.weightRecord.findMany({
+        where,
+        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+    ])
+
+    return ok({
+      items: records.map(record => serializeWeightRecord(record, heightCm)),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    })
+  })
+
+  app.get('/api/weights/stats', async (request) => {
+    const query = weightStatsQuerySchema.parse(request.query)
+    const user = await app.db.user.findUnique({ where: { id: request.user.userId } })
+    if (!user) {
+      const error = new Error('User not found') as Error & { statusCode: number }
+      error.statusCode = 401
+      throw error
+    }
+
+    const heightCm = toNumber(user.heightCm)
+    const dayRange = getChinaDayRange()
+    const start = addChinaDays(dayRange.start, -(query.days - 1))
+    const [latestRecords, periodRecords] = await Promise.all([
+      app.db.weightRecord.findMany({
+        where: { userId: request.user.userId },
+        orderBy: [{ measuredAt: 'desc' }, { id: 'desc' }],
+        take: 2,
+      }),
+      app.db.weightRecord.findMany({
+        where: {
+          userId: request.user.userId,
+          measuredAt: { gte: start, lt: dayRange.end },
+        },
+        orderBy: [{ measuredAt: 'asc' }, { id: 'asc' }],
+      }),
+    ])
+
+    const currentWeightKg = latestRecords[0] ? Number(latestRecords[0].weightKg) : null
+    const previousWeightKg = latestRecords[1] ? Number(latestRecords[1].weightKg) : null
+    const rawBmi = currentWeightKg === null ? null : calculateRawBmi(currentWeightKg, heightCm)
+    const bmi = rawBmi === null ? null : round(rawBmi, 1)
+    const bmiCategory = getBmiCategory(rawBmi)
+    const dailyLatest = new Map<string, (typeof periodRecords)[number]>()
+    for (const record of periodRecords) {
+      dailyLatest.set(formatChinaDate(record.measuredAt), record)
+    }
+    const trend = Array.from(dailyLatest.entries()).map(([date, record]) => {
+      const weightKg = Number(record.weightKg)
+      return {
+        date,
+        weightKg,
+        bmi: calculateBmi(weightKg, heightCm),
+      }
+    })
+    const targetWeightKg = toNumber(user.targetWeightKg)
+
+    return ok({
+      days: query.days,
+      currentWeightKg,
+      previousWeightKg,
+      changeKg: currentWeightKg !== null && previousWeightKg !== null
+        ? round(currentWeightKg - previousWeightKg)
+        : null,
+      targetWeightKg,
+      distanceToTargetKg: currentWeightKg !== null && targetWeightKg !== null
+        ? round(Math.abs(currentWeightKg - targetWeightKg))
+        : null,
+      heightCm,
+      weightUnit: user.weightUnit || 'kg',
+      bmi,
+      bmiCategory,
+      bmiLabel: getBmiLabel(bmiCategory),
+      trend,
+    })
+  })
+
+  app.post('/api/weights', async (request) => {
+    const body = weightRecordSchema.parse(request.body)
+    const record = await app.db.weightRecord.create({
+      data: {
+        userId: request.user.userId,
+        weightKg: body.weightKg,
+        measuredAt: parseMeasuredAt(body.measuredAt),
+      },
+    })
+    const user = await app.db.user.findUnique({ where: { id: request.user.userId } })
+
+    return ok(serializeWeightRecord(record, toNumber(user?.heightCm)), '体重已记录')
+  })
+
+  app.patch('/api/weights/:id', async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params)
+    const body = weightRecordSchema.parse(request.body)
+    const existing = await app.db.weightRecord.findFirst({
+      where: { id: params.id, userId: request.user.userId },
+    })
+    if (!existing) {
+      return reply.code(404).send(fail('体重记录不存在', 404))
+    }
+    const record = await app.db.weightRecord.update({
+      where: { id: params.id },
+      data: {
+        weightKg: body.weightKg,
+        measuredAt: parseMeasuredAt(body.measuredAt),
+      },
+    })
+    const user = await app.db.user.findUnique({ where: { id: request.user.userId } })
+
+    return ok(serializeWeightRecord(record, toNumber(user?.heightCm)), '记录已更新')
+  })
+
+  app.delete('/api/weights/:id', async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params)
+    const record = await app.db.weightRecord.findFirst({
+      where: { id: params.id, userId: request.user.userId },
+    })
+    if (!record) {
+      return reply.code(404).send(fail('体重记录不存在', 404))
+    }
+
+    await app.db.weightRecord.delete({ where: { id: params.id } })
+    return ok({ id: params.id }, '记录已删除')
   })
 
   app.get('/api/checkins/today', async (request) => {

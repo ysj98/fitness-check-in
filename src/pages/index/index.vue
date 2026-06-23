@@ -113,9 +113,18 @@ onShow(() => {
 
 async function initPage() {
   loading.value = true
+  console.log(123)
   try {
+    console.log(456)
+
     await ensureLogin()
+    console.log(0)
+
     await loadDashboard()
+  }
+  catch (err) {
+    console.log(111111233)
+    console.log(err)
   }
   finally {
     loading.value = false
@@ -123,6 +132,8 @@ async function initPage() {
 }
 
 async function ensureLogin() {
+  console.log(789)
+
   if (tokenStore.updateNowTime().hasLogin) {
     loginReady.value = true
     return

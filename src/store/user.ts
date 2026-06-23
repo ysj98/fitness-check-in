@@ -12,6 +12,9 @@ const userInfoState: IUserInfoRes = {
   nickname: '',
   avatar: '/static/images/default-avatar.png',
   dailyGoal: 1,
+  heightCm: null,
+  targetWeightKg: null,
+  weightUnit: 'kg',
 }
 
 export const useUserStore = defineStore(
@@ -27,6 +30,7 @@ export const useUserStore = defineStore(
         val.avatar = userInfoState.avatar
       }
       val.dailyGoal = val.dailyGoal || userInfoState.dailyGoal
+      val.weightUnit = val.weightUnit || userInfoState.weightUnit
       userInfo.value = val
     }
     const setUserAvatar = (avatar: string) => {

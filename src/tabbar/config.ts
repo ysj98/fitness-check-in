@@ -17,6 +17,12 @@ export const nativeTabbarList: NativeTabBarItem[] = [
     text: '打卡',
   },
   {
+    iconPath: 'static/tabbar/scan.png',
+    selectedIconPath: 'static/tabbar/scan.png',
+    pagePath: 'pages/weight/index',
+    text: '体重',
+  },
+  {
     iconPath: 'static/tabbar/personal.png',
     selectedIconPath: 'static/tabbar/personalHL.png',
     pagePath: 'pages/me/me',
@@ -30,6 +36,12 @@ export const customTabbarList: CustomTabBarItem[] = [
     pagePath: 'pages/index/index',
     iconType: 'unocss',
     icon: 'i-carbon-calendar',
+  },
+  {
+    text: '体重',
+    pagePath: 'pages/weight/index',
+    iconType: 'unocss',
+    icon: 'i-carbon-scale',
   },
   {
     pagePath: 'pages/me/me',

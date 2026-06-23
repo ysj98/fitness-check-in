@@ -6,6 +6,9 @@ export interface AppUser {
   gender?: string | null
   birthday?: string | null
   dailyGoal: number
+  heightCm?: number | string | null
+  targetWeightKg?: number | string | null
+  weightUnit?: string
   createdAt?: Date
   updatedAt?: Date
 }
@@ -15,6 +18,15 @@ export interface AppCheckIn {
   userId: number
   checkedAt: Date
   createdAt: Date
+}
+
+export interface AppWeightRecord {
+  id: number
+  userId: number
+  weightKg: number | string
+  measuredAt: Date
+  createdAt: Date
+  updatedAt?: Date
 }
 
 export interface AppDb {
@@ -29,6 +41,14 @@ export interface AppDb {
     findMany: (args: unknown) => Promise<AppCheckIn[]>
     findFirst: (args: unknown) => Promise<AppCheckIn | null>
     delete: (args: unknown) => Promise<AppCheckIn>
+  }
+  weightRecord: {
+    count: (args: unknown) => Promise<number>
+    create: (args: unknown) => Promise<AppWeightRecord>
+    findMany: (args: unknown) => Promise<AppWeightRecord[]>
+    findFirst: (args: unknown) => Promise<AppWeightRecord | null>
+    update: (args: unknown) => Promise<AppWeightRecord>
+    delete: (args: unknown) => Promise<AppWeightRecord>
   }
 }
 

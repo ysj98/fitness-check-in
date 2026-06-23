@@ -24,6 +24,7 @@ const httpInterceptor = {
       else {
         options.url += `?${queryStr}`
       }
+      delete options.query
     }
     // 非 http 开头需拼接地址
     if (!options.url.startsWith('http')) {

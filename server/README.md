@@ -153,12 +153,18 @@ pm2 start ecosystem.config.cjs --env production
 - `GET /api/user/info`
 - `POST /api/user/avatar`
 - `PATCH /api/user/profile`
+- `PATCH /api/user/weight-settings`
 - `GET /api/checkins/today`
 - `POST /api/checkins`
 - `GET /api/checkins/stats`
 - `GET /api/checkins/recent?limit=20`
 - `GET /api/checkins/month?month=YYYY-MM`
 - `DELETE /api/checkins/:id`
+- `GET /api/weights?page=1&pageSize=20`
+- `GET /api/weights/stats?days=7|30|90`
+- `POST /api/weights`
+- `PATCH /api/weights/:id`
+- `DELETE /api/weights/:id`
 - `GET /uploads/avatars/:file`
 
 ## 数据库
@@ -172,6 +178,9 @@ pnpm prisma:migrate
 
 - `users`
 - `check_ins`
+- `weight_records`
+
+体重统一以公斤保存。BMI 由体重和用户当前身高实时计算，不单独写入数据库。
 
 ## 头像文件
 

@@ -78,6 +78,7 @@ export default defineConfig({
     'i-carbon-calendar',
     'i-carbon-home',
     'i-carbon-user',
+    'i-carbon-scale',
     'i-carbon-ibm-watson-language-translator',
     'i-carbon-menu',
   ],

@@ -21,6 +21,7 @@ export function http<T>(options: CustomRequestOptions) {
       // #endif
       // 响应成功
       success: async (res) => {
+        console.log(666)
         const responseData = res.data as IResponse<T>
         const { code } = responseData
 

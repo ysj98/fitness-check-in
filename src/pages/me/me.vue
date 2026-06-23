@@ -31,6 +31,7 @@ const form = reactive({
   gender: '',
   birthday: '',
   dailyGoal: 1,
+  heightCm: '',
 })
 
 const avatarPreview = computed(() => avatarTempUrl.value || form.avatarUrl || '/static/images/default-avatar.png')
@@ -59,6 +60,7 @@ async function initProfile() {
   form.gender = userInfo.gender || ''
   form.birthday = userInfo.birthday || ''
   form.dailyGoal = userInfo.dailyGoal || 1
+  form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
   badges.value = stats.badges
 }
 
@@ -105,6 +107,15 @@ async function handleSave() {
     return
   }
 
+  const heightCm = form.heightCm === '' ? null : Number(form.heightCm)
+  if (heightCm !== null && (!Number.isFinite(heightCm) || heightCm < 100 || heightCm > 250)) {
+    uni.showToast({
+      title: '请输入 100-250 cm 的身高',
+      icon: 'none',
+    })
+    return
+  }
+
   saving.value = true
   try {
     const userInfo = await updateUserProfile({
@@ -113,6 +124,7 @@ async function handleSave() {
       gender: form.gender,
       birthday: form.birthday,
       dailyGoal: form.dailyGoal,
+      heightCm,
     })
     userStore.setUserInfo(userInfo)
     uni.showToast({
@@ -195,6 +207,23 @@ async function handleSave() {
           </view>
         </view>
       </picker>
+
+      <view class="field">
+        <text class="field-label">
+          身高
+        </text>
+        <view class="field-unit-input">
+          <input
+            v-model="form.heightCm"
+            class="field-input"
+            type="digit"
+            :maxlength="5"
+            placeholder="未设置"
+            placeholder-class="placeholder"
+          >
+          <text>cm</text>
+        </view>
+      </view>
     </view>
 
     <view class="achievement-section">
@@ -350,6 +379,20 @@ async function handleSave() {
   color: #0f172a;
   font-size: 28rpx;
   text-align: right;
+}
+
+.field-unit-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12rpx;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.field-unit-input .field-input {
+  flex: 0 1 220rpx;
 }
 
 .field-value.muted,

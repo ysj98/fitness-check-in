@@ -15,6 +15,7 @@ export interface IUserProfileUpdate {
   gender?: string
   birthday?: string
   dailyGoal?: number
+  heightCm?: number | null
 }
 
 export interface IAvatarUploadRes {
