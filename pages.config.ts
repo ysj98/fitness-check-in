@@ -3,9 +3,9 @@ import { tabBar } from './src/tabbar/config'
 
 export default defineUniPages({
   globalStyle: {
-    navigationStyle: 'default',
+    navigationStyle: 'custom',
     navigationBarTitleText: '运动打卡',
-    navigationBarBackgroundColor: '#ecfdf5',
+    navigationBarBackgroundColor: '#F2F2F7',
     navigationBarTextStyle: 'black',
     backgroundColor: '#FFFFFF',
   },

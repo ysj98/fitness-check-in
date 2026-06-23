@@ -1,19 +1,21 @@
 <script lang="ts" setup>
 import type { CheckInBadge } from '@/api/checkins'
+import type { ThemeMode } from '@/store'
 import { getCheckInStats } from '@/api/checkins'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
-import { useTokenStore, useUserStore } from '@/store'
+import { useThemeStore, useTokenStore, useUserStore } from '@/store'
+import { triggerSuccessHaptic } from '@/utils/haptics'
 
 definePage({
   style: {
+    navigationStyle: 'custom',
     navigationBarTitleText: '我的',
-    navigationBarBackgroundColor: '#f8fafc',
-    navigationBarTextStyle: 'black',
   },
 })
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 const saving = ref(false)
 const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
@@ -74,6 +76,14 @@ function handleBirthdayChange(event: { detail: { value: string } }) {
 
 function handleDailyGoalChange(event: { detail: { value: number } }) {
   form.dailyGoal = Number(dailyGoalOptions[event.detail.value] || 1)
+}
+
+function selectTheme(mode: ThemeMode) {
+  if (themeStore.mode === mode) {
+    return
+  }
+  themeStore.setMode(mode)
+  triggerSuccessHaptic()
 }
 
 async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
@@ -139,8 +149,10 @@ async function handleSave() {
 </script>
 
 <template>
-  <view class="profile-page">
-    <view class="profile-card">
+  <view class="app-page profile-page">
+    <ios-page-header title="我的" subtitle="个人健康资料" />
+
+    <view class="profile-summary ios-card">
       <button
         class="avatar-button"
         open-type="chooseAvatar"
@@ -152,19 +164,18 @@ async function handleSave() {
           上传中
         </view>
       </button>
-      <view class="profile-title">
-        {{ form.nickname || '我的资料' }}
+      <view class="profile-copy">
+        <text class="profile-title">{{ form.nickname || '微信用户' }}</text>
+        <text class="profile-subtitle">{{ unlockedBadgeCount }} 项成就已达成</text>
       </view>
-      <view class="profile-subtitle">
-        个人信息
-      </view>
+      <text class="profile-chevron i-carbon-chevron-right" />
     </view>
 
-    <view class="form-section">
+    <text class="ios-section-title">个人资料</text>
+    <view class="form-section ios-card">
       <view class="field">
-        <text class="field-label">
-          昵称
-        </text>
+        <text class="field-icon blue-icon i-carbon-user" />
+        <text class="field-label">昵称</text>
         <input
           v-model="form.nickname"
           class="field-input"
@@ -177,41 +188,40 @@ async function handleSave() {
 
       <picker :value="genderIndex" :range="genderOptions" range-key="label" @change="handleGenderChange">
         <view class="field picker-field">
-          <text class="field-label">
-            性别
-          </text>
+          <text class="field-icon pink-icon i-carbon-gender-male" />
+          <text class="field-label">性别</text>
           <view class="field-value">
             {{ genderLabel }}
           </view>
+          <text class="field-chevron i-carbon-chevron-right" />
         </view>
       </picker>
 
       <picker mode="date" :value="form.birthday || '2000-01-01'" @change="handleBirthdayChange">
         <view class="field picker-field">
-          <text class="field-label">
-            生日
-          </text>
+          <text class="field-icon orange-icon i-carbon-calendar" />
+          <text class="field-label">生日</text>
           <view class="field-value" :class="{ muted: !form.birthday }">
             {{ form.birthday || '未设置' }}
           </view>
+          <text class="field-chevron i-carbon-chevron-right" />
         </view>
       </picker>
 
       <picker :value="dailyGoalIndex" :range="dailyGoalOptions" @change="handleDailyGoalChange">
         <view class="field picker-field">
-          <text class="field-label">
-            每日目标
-          </text>
+          <text class="field-icon green-icon i-carbon-chart-bar-target" />
+          <text class="field-label">每日目标</text>
           <view class="field-value">
             {{ form.dailyGoal }} 次
           </view>
+          <text class="field-chevron i-carbon-chevron-right" />
         </view>
       </picker>
 
       <view class="field">
-        <text class="field-label">
-          身高
-        </text>
+        <text class="field-icon purple-icon i-carbon-ruler" />
+        <text class="field-label">身高</text>
         <view class="field-unit-input">
           <input
             v-model="form.heightCm"
@@ -226,32 +236,42 @@ async function handleSave() {
       </view>
     </view>
 
-    <view class="achievement-section">
-      <view class="achievement-head">
-        <text class="achievement-title">
-          我的成就
-        </text>
-        <text class="achievement-count">
-          {{ unlockedBadgeCount }}/{{ badges.length }}
-        </text>
+    <text class="ios-section-title">外观</text>
+    <view class="appearance-card ios-card">
+      <view class="appearance-label">
+        <text class="field-icon blue-icon" :class="themeStore.isDark ? 'i-carbon-moon' : 'i-carbon-sun'" />
+        <text>主题</text>
       </view>
-      <view class="badge-grid">
-        <view
-          v-for="badge in badges"
-          :key="badge.key"
-          class="badge-item"
-          :class="{ unlocked: badge.unlocked }"
-        >
-          <view class="badge-mark">
-            {{ badge.unlocked ? '已达成' : '未达成' }}
-          </view>
-          <view class="badge-name">
-            {{ badge.name }}
-          </view>
-          <view class="badge-desc">
-            {{ badge.description }}
-          </view>
+      <view class="theme-switch">
+        <button :class="{ active: themeStore.mode === 'light' }" @click="selectTheme('light')">
+          浅色
+        </button>
+        <button :class="{ active: themeStore.mode === 'dark' }" @click="selectTheme('dark')">
+          深色
+        </button>
+      </view>
+    </view>
+
+    <view class="achievement-heading">
+      <text class="ios-section-title achievement-section-title">我的成就</text>
+      <text class="achievement-count numeric">{{ unlockedBadgeCount }}/{{ badges.length }}</text>
+    </view>
+    <view class="badge-grid">
+      <view
+        v-for="(badge, index) in badges"
+        :key="badge.key"
+        class="badge-item ios-card"
+        :class="{ unlocked: badge.unlocked }"
+      >
+        <view class="badge-icon">
+          <text :class="badge.unlocked ? 'i-carbon-trophy-filled' : 'i-carbon-trophy'" />
         </view>
+        <view class="badge-copy">
+          <text class="badge-name">{{ badge.name }}</text>
+          <text class="badge-desc">{{ badge.description }}</text>
+        </view>
+        <text v-if="badge.unlocked" class="badge-state i-carbon-checkmark-filled" />
+        <text v-else class="badge-index numeric">{{ String(index + 1).padStart(2, '0') }}</text>
       </view>
     </view>
 
@@ -268,50 +288,56 @@ async function handleSave() {
 
 <style scoped lang="scss">
 .profile-page {
-  min-height: 100vh;
-  padding: 32rpx 28rpx 150rpx;
-  background: #f8fafc;
-  color: #0f172a;
-  box-sizing: border-box;
+  padding-right: 0;
+  padding-left: 0;
 }
 
-.profile-card {
+button::after {
+  border: 0;
+}
+
+.profile-summary,
+.form-section,
+.appearance-card,
+.badge-grid,
+.save-button {
+  margin-right: var(--app-gutter);
+  margin-left: var(--app-gutter);
+}
+
+.profile-summary {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 40rpx 28rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 16rpx;
-  background: #ffffff;
+  min-height: 154rpx;
+  padding: 24rpx 28rpx;
+  box-sizing: border-box;
+  animation: enter var(--app-motion-normal) ease-out both;
 }
 
 .avatar-button {
   position: relative;
-  width: 150rpx;
-  height: 150rpx;
+  flex: 0 0 auto;
+  width: 106rpx;
+  height: 106rpx;
   padding: 0;
   border-radius: 50%;
-  background: transparent;
+  background: var(--app-fill);
   overflow: hidden;
   transition:
-    transform 180ms ease-out,
-    opacity 180ms ease-out;
-}
-
-.avatar-button::after {
-  border: 0;
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out;
 }
 
 .avatar-button-pressed {
-  opacity: 0.86;
+  opacity: 0.76;
   transform: scale(0.96);
 }
 
 .avatar {
-  width: 150rpx;
-  height: 150rpx;
+  width: 106rpx;
+  height: 106rpx;
   border-radius: 50%;
-  background: #e2e8f0;
+  background: var(--app-fill);
 }
 
 .avatar-mask {
@@ -320,38 +346,52 @@ async function handleSave() {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  color: #ffffff;
-  background: rgba(15, 23, 42, 0.48);
-  font-size: 24rpx;
+  color: #fff;
+  background: var(--app-mask);
+  font-size: 20rpx;
+}
+
+.profile-copy {
+  flex: 1;
+  min-width: 0;
+  margin-left: 24rpx;
+}
+
+.profile-title,
+.profile-subtitle {
+  display: block;
 }
 
 .profile-title {
-  margin-top: 22rpx;
-  font-size: 36rpx;
-  font-weight: 800;
+  font-size: 34rpx;
+  font-weight: 700;
 }
 
 .profile-subtitle {
-  margin-top: 8rpx;
-  color: #64748b;
-  font-size: 24rpx;
+  margin-top: 7rpx;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+}
+
+.profile-chevron,
+.field-chevron {
+  flex: 0 0 auto;
+  color: var(--app-label-tertiary);
+  font-size: 28rpx;
 }
 
 .form-section {
-  margin-top: 28rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 16rpx;
-  background: #ffffff;
   overflow: hidden;
+  animation: enter var(--app-motion-normal) 50ms ease-out both;
 }
 
 .field {
   display: flex;
   align-items: center;
   min-height: 104rpx;
-  padding: 0 28rpx;
-  border-bottom: 1px solid #f1f5f9;
+  margin-left: 28rpx;
+  padding: 0 26rpx 0 0;
+  border-bottom: 1rpx solid var(--app-separator);
   box-sizing: border-box;
 }
 
@@ -359,26 +399,66 @@ async function handleSave() {
   border-bottom: 0;
 }
 
-.field-label {
-  flex: 0 0 156rpx;
-  color: #334155;
+.field-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  margin-right: 20rpx;
+  border-radius: 14rpx;
   font-size: 28rpx;
-  font-weight: 600;
+}
+
+.blue-icon {
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
+}
+
+.pink-icon {
+  color: var(--app-pink);
+  background: var(--app-pink-soft);
+}
+
+.orange-icon {
+  color: var(--app-orange);
+  background: var(--app-orange-soft);
+}
+
+.green-icon {
+  color: var(--app-green);
+  background: var(--app-green-soft);
+}
+
+.purple-icon {
+  color: #af52de;
+  background: rgba(175, 82, 222, 0.14);
+}
+
+.field-label {
+  flex: 0 0 152rpx;
+  color: var(--app-label-primary);
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+.field-input,
+.field-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--app-label-primary);
+  font-size: 28rpx;
+  text-align: right;
 }
 
 .field-input {
-  flex: 1;
   min-height: 80rpx;
-  color: #0f172a;
-  font-size: 28rpx;
-  text-align: right;
 }
 
-.field-value {
-  flex: 1;
-  color: #0f172a;
-  font-size: 28rpx;
-  text-align: right;
+.field-value.muted,
+.placeholder {
+  color: var(--app-label-tertiary);
 }
 
 .field-unit-input {
@@ -386,55 +466,70 @@ async function handleSave() {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12rpx;
-  color: #64748b;
+  gap: 10rpx;
+  color: var(--app-label-secondary);
   font-size: 24rpx;
 }
 
 .field-unit-input .field-input {
-  flex: 0 1 220rpx;
+  flex: 0 1 180rpx;
 }
 
-.field-value.muted,
-.placeholder {
-  color: #94a3b8;
-}
-
-.picker-field {
-  min-height: 104rpx;
-}
-
-.achievement-section {
-  margin-top: 28rpx;
-  padding: 28rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 16rpx;
-  background: #ffffff;
-}
-
-.achievement-head {
+.appearance-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
-  margin-bottom: 22rpx;
+  min-height: 104rpx;
+  padding: 16rpx 24rpx 16rpx 28rpx;
+  box-sizing: border-box;
 }
 
-.achievement-title {
-  color: #0f172a;
-  font-size: 32rpx;
-  font-weight: 800;
+.appearance-label {
+  display: flex;
+  align-items: center;
+  font-size: 28rpx;
+}
+
+.theme-switch {
+  display: flex;
+  padding: 4rpx;
+  border-radius: 16rpx;
+  background: var(--app-fill);
+}
+
+.theme-switch button {
+  min-width: 92rpx;
+  height: 58rpx;
+  padding: 0 16rpx;
+  border-radius: 13rpx;
+  color: var(--app-label-secondary);
+  background: transparent;
+  font-size: 24rpx;
+  line-height: 58rpx;
+}
+
+.theme-switch button.active {
+  color: var(--app-label-primary);
+  background: var(--app-surface);
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+  font-weight: 650;
+}
+
+.achievement-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-right: calc(var(--app-gutter) + 12rpx);
+}
+
+.achievement-section-title {
+  margin-right: 0;
 }
 
 .achievement-count {
-  min-width: 86rpx;
-  height: 44rpx;
-  border-radius: 999rpx;
-  color: #047857;
-  background: #d1fae5;
-  font-size: 24rpx;
-  line-height: 44rpx;
-  text-align: center;
+  margin-bottom: 14rpx;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
 }
 
 .badge-grid {
@@ -444,73 +539,112 @@ async function handleSave() {
 }
 
 .badge-item {
-  min-height: 142rpx;
-  padding: 18rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 14rpx;
-  background: #f8fafc;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 180rpx;
+  padding: 22rpx;
   box-sizing: border-box;
-  opacity: 0.68;
+  opacity: 0.62;
 }
 
 .badge-item.unlocked {
-  border-color: #86efac;
-  background: #ecfdf5;
   opacity: 1;
-  box-shadow: 0 12rpx 24rpx rgba(15, 118, 110, 0.08);
 }
 
-.badge-mark {
-  display: inline-block;
-  height: 34rpx;
-  padding: 0 12rpx;
-  border-radius: 999rpx;
-  color: #64748b;
-  background: #e2e8f0;
-  font-size: 20rpx;
-  line-height: 34rpx;
+.badge-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 50%;
+  color: var(--app-orange);
+  background: var(--app-orange-soft);
+  font-size: 29rpx;
 }
 
-.badge-item.unlocked .badge-mark {
-  color: #ffffff;
-  background: #059669;
+.badge-item:nth-child(3n + 2) .badge-icon {
+  color: var(--app-pink);
+  background: var(--app-pink-soft);
+}
+
+.badge-item:nth-child(3n) .badge-icon {
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
+}
+
+.badge-copy {
+  flex: 1;
+  min-width: 0;
+  margin-left: 14rpx;
+}
+
+.badge-name,
+.badge-desc {
+  display: block;
 }
 
 .badge-name {
-  margin-top: 14rpx;
-  color: #0f172a;
-  font-size: 28rpx;
-  font-weight: 800;
+  font-size: 26rpx;
+  font-weight: 650;
 }
 
 .badge-desc {
-  margin-top: 6rpx;
-  color: #64748b;
-  font-size: 22rpx;
+  margin-top: 7rpx;
+  color: var(--app-label-secondary);
+  font-size: 20rpx;
   line-height: 1.4;
+}
+
+.badge-state,
+.badge-index {
+  position: absolute;
+  right: 18rpx;
+  bottom: 16rpx;
+  color: var(--app-green);
+  font-size: 24rpx;
+}
+
+.badge-index {
+  color: var(--app-label-tertiary);
+  font-size: 20rpx;
 }
 
 .save-button {
   height: 92rpx;
   margin-top: 36rpx;
-  border-radius: 999rpx;
-  color: #ffffff;
-  background: linear-gradient(135deg, #10b981, #0f766e);
+  border-radius: var(--app-control-radius);
+  color: #fff;
+  background: var(--app-green);
+  box-shadow: 0 10rpx 24rpx rgba(52, 199, 89, 0.18);
   font-size: 30rpx;
   font-weight: 700;
   line-height: 92rpx;
-  box-shadow: 0 18rpx 36rpx rgba(15, 118, 110, 0.18);
   transition:
-    transform 180ms ease-out,
-    opacity 180ms ease-out;
-}
-
-.save-button::after {
-  border: 0;
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out;
 }
 
 .save-button-pressed {
-  opacity: 0.9;
-  transform: scale(0.98);
+  opacity: 0.82;
+  transform: scale(0.985);
+}
+
+.save-button[disabled] {
+  opacity: 0.46;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(14rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

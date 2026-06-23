@@ -63,11 +63,11 @@ export const tabbarList = customTabbarEnable ? customTabbarList : nativeTabbarLi
 
 const _tabbar: TabBar = {
   custom: selectedTabbarStrategy === TABBAR_STRATEGY_MAP.CUSTOM_TABBAR,
-  color: '#64748b',
-  selectedColor: '#059669',
-  backgroundColor: '#ffffff',
+  color: '#8e8e93',
+  selectedColor: '#34c759',
+  backgroundColor: '#f9f9f9',
   borderStyle: 'black',
-  height: '50px',
+  height: '58px',
   fontSize: '10px',
   iconWidth: '24px',
   spacing: '3px',

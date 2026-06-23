@@ -3,12 +3,16 @@
 import { customTabbarEnable, needHideNativeTabbar, tabbarCacheEnable } from './config'
 import { tabbarList, tabbarStore } from './store'
 import TabbarItem from './TabbarItem.vue'
+import { useThemeStore } from '@/store/theme'
 
 // #ifdef MP-WEIXIN
 // 将自定义节点设置成虚拟的（去掉自定义组件包裹层），更加接近Vue组件的表现，能更好的使用flex属性
 defineOptions({
   virtualHost: true,
 })
+
+const themeStore = useThemeStore()
+
 // #endif
 
 /**
@@ -88,17 +92,17 @@ onMounted(() => {
   })
 })
 // #endif
-const activeColor = '#059669'
-const inactiveColor = '#64748b'
 function getColorByIndex(index: number) {
+  const activeColor = themeStore.isDark ? '#30d158' : '#34c759'
+  const inactiveColor = themeStore.isDark ? 'rgba(235, 235, 245, 0.6)' : 'rgba(60, 60, 67, 0.62)'
   return tabbarStore.curIdx === index ? activeColor : inactiveColor
 }
 </script>
 
 <template>
-  <view v-if="customTabbarEnable" class="h-50px pb-safe">
-    <view class="border-and-fixed bg-white" @touchmove.stop.prevent>
-      <view class="h-50px flex items-center">
+  <view v-if="customTabbarEnable" class="tabbar-shell h-58px pb-safe" :class="`theme-${themeStore.mode}`">
+    <view class="border-and-fixed" @touchmove.stop.prevent>
+      <view class="tabbar-content h-58px flex items-center">
         <view
           v-for="(item, index) in tabbarList" :key="index"
           class="flex flex-1 flex-col items-center justify-center"
@@ -127,8 +131,26 @@ function getColorByIndex(index: number) {
   left: 0;
   right: 0;
   z-index: 1000;
-  border-top: 1px solid #eee;
+  border-top: 1rpx solid var(--app-separator);
+  background: rgba(249, 249, 249, 0.84);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
   box-sizing: border-box;
+}
+
+.theme-dark .border-and-fixed {
+  background: rgba(28, 28, 30, 0.84);
+}
+
+.tabbar-content > view {
+  min-height: 88rpx;
+  transition:
+    color var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) ease-out;
+}
+
+.tabbar-content > view:active {
+  transform: scale(0.94);
 }
 // 中间鼓包的样式
 .bulge {

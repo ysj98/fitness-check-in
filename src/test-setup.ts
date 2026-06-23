@@ -33,6 +33,9 @@ const uniMock = {
   chooseImage: vi.fn(),
   getSystemInfoSync: vi.fn().mockReturnValue({ platform: 'devtools' }),
   getSystemInfo: vi.fn(),
+  getWindowInfo: vi.fn().mockReturnValue({ statusBarHeight: 20 }),
+  getMenuButtonBoundingClientRect: vi.fn().mockReturnValue({ top: 24, height: 32 }),
+  vibrateShort: vi.fn(),
   onNetworkStatusChange: vi.fn(),
   getNetworkType: vi.fn(),
 }

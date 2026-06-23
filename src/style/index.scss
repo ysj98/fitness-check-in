@@ -11,11 +11,106 @@
 
 :root,
 page {
-  // 修改按主题色
-  // --wot-color-theme: #37c2bc;
+  --app-bg: #f2f2f7;
+  --app-surface: #ffffff;
+  --app-surface-secondary: #f2f2f7;
+  --app-surface-tertiary: #e5e5ea;
+  --app-label-primary: #000000;
+  --app-label-secondary: rgba(60, 60, 67, 0.72);
+  --app-label-tertiary: rgba(60, 60, 67, 0.44);
+  --app-separator: rgba(60, 60, 67, 0.18);
+  --app-fill: rgba(120, 120, 128, 0.12);
+  --app-fill-strong: rgba(120, 120, 128, 0.2);
+  --app-mask: rgba(0, 0, 0, 0.42);
+  --app-green: #34c759;
+  --app-green-soft: rgba(52, 199, 89, 0.14);
+  --app-blue: #007aff;
+  --app-blue-soft: rgba(0, 122, 255, 0.13);
+  --app-orange: #ff9500;
+  --app-orange-soft: rgba(255, 149, 0, 0.14);
+  --app-pink: #ff2d55;
+  --app-pink-soft: rgba(255, 45, 85, 0.13);
+  --app-red: #ff3b30;
+  --app-card-radius: 24rpx;
+  --app-control-radius: 18rpx;
+  --app-gutter: 32rpx;
+  --app-shadow: 0 2rpx 14rpx rgba(0, 0, 0, 0.05);
+  --app-motion-fast: 160ms;
+  --app-motion-normal: 240ms;
+  --wot-color-theme: var(--app-green);
 
-  // 修改按钮背景色
-  // --wot-button-primary-bg-color: green;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+  background: var(--app-bg);
+}
+
+.theme-dark {
+  --app-bg: #000000;
+  --app-surface: #1c1c1e;
+  --app-surface-secondary: #2c2c2e;
+  --app-surface-tertiary: #3a3a3c;
+  --app-label-primary: #ffffff;
+  --app-label-secondary: rgba(235, 235, 245, 0.72);
+  --app-label-tertiary: rgba(235, 235, 245, 0.42);
+  --app-separator: rgba(84, 84, 88, 0.62);
+  --app-fill: rgba(120, 120, 128, 0.24);
+  --app-fill-strong: rgba(120, 120, 128, 0.36);
+  --app-mask: rgba(0, 0, 0, 0.68);
+  --app-green: #30d158;
+  --app-green-soft: rgba(48, 209, 88, 0.18);
+  --app-blue: #0a84ff;
+  --app-blue-soft: rgba(10, 132, 255, 0.2);
+  --app-orange: #ff9f0a;
+  --app-orange-soft: rgba(255, 159, 10, 0.2);
+  --app-pink: #ff375f;
+  --app-pink-soft: rgba(255, 55, 95, 0.2);
+  --app-red: #ff453a;
+  --app-shadow: none;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+.app-page {
+  min-height: 100vh;
+  padding: 0 var(--app-gutter) calc(150rpx + env(safe-area-inset-bottom));
+  color: var(--app-label-primary);
+  background: var(--app-bg);
+  box-sizing: border-box;
+}
+
+.ios-card {
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.ios-section-title {
+  display: block;
+  margin: 38rpx 12rpx 14rpx;
+  color: var(--app-label-secondary);
+  font-size: 24rpx;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.ios-pressed {
+  opacity: 0.72;
+  transform: scale(0.985);
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .app-shell * {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
 }
 
 /*

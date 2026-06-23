@@ -10,13 +10,13 @@ import {
   updateWeight,
   updateWeightSettings,
 } from '@/api/weights'
-import { useTokenStore, useUserStore } from '@/store'
+import { useThemeStore, useTokenStore, useUserStore } from '@/store'
+import { triggerSuccessHaptic } from '@/utils/haptics'
 
 definePage({
   style: {
+    navigationStyle: 'custom',
     navigationBarTitleText: '体重管理',
-    navigationBarBackgroundColor: '#ecfdf5',
-    navigationBarTextStyle: 'black',
   },
 })
 
@@ -39,6 +39,7 @@ const emptyStats: WeightStatsRes = {
 
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 const loading = ref(false)
 const loadFailed = ref(false)
 const savingRecord = ref(false)
@@ -81,24 +82,24 @@ const chartData = computed(() => ({
   }],
 }))
 const chartOpts = computed(() => ({
-  color: ['#059669'],
+  color: [themeStore.isDark ? '#0a84ff' : '#007aff'],
   padding: [12, 12, 4, 8],
   dataLabel: false,
   dataPointShape: true,
   legend: { show: false },
   xAxis: {
     disableGrid: true,
-    fontColor: '#64748b',
-    axisLineColor: '#cbd5e1',
+    fontColor: themeStore.isDark ? '#98989d' : '#8e8e93',
+    axisLineColor: themeStore.isDark ? '#38383a' : '#d1d1d6',
   },
   yAxis: {
     gridType: 'dash',
     dashLength: 4,
-    gridColor: '#e2e8f0',
+    gridColor: themeStore.isDark ? '#2c2c2e' : '#e5e5ea',
     data: [{
       title: trendMetric.value === 'weight' ? unitLabel.value : 'BMI',
       tofix: 1,
-      fontColor: '#64748b',
+      fontColor: themeStore.isDark ? '#98989d' : '#8e8e93',
     }],
   },
   extra: {
@@ -237,6 +238,7 @@ async function saveRecord() {
     recordModalVisible.value = false
     await refreshWeightData()
     successPulse.value = true
+    triggerSuccessHaptic()
     uni.showToast({ title: editingRecord.value ? '记录已更新' : '体重已记录', icon: 'success' })
     setTimeout(() => {
       successPulse.value = false
@@ -359,7 +361,9 @@ function getChinaDateTimeParts(date: Date) {
 </script>
 
 <template>
-  <view class="weight-page">
+  <view class="app-page weight-page">
+    <ios-page-header title="体重" subtitle="健康趋势" />
+
     <view v-if="loadFailed" class="state-panel">
       <text>加载失败</text>
       <button class="retry-button" @click="loadPage">
@@ -368,7 +372,7 @@ function getChinaDateTimeParts(date: Date) {
     </view>
 
     <template v-else>
-      <view class="hero" :class="{ pulse: successPulse }">
+      <view class="hero ios-card" :class="{ pulse: successPulse }">
         <view class="hero-main">
           <text class="hero-label">当前体重</text>
           <view class="weight-value">
@@ -377,13 +381,13 @@ function getChinaDateTimeParts(date: Date) {
           </view>
           <text class="hero-change">较上次 {{ formatChange() }} {{ unitLabel }}</text>
         </view>
-        <button class="settings-button" hover-class="control-pressed" @click="openSettings">
-          设置
+        <button class="settings-button" aria-label="体重设置" hover-class="control-pressed" @click="openSettings">
+          <text class="i-carbon-settings" />
         </button>
       </view>
 
       <view class="summary-grid">
-        <view class="summary-item">
+        <view class="summary-item bmi-card">
           <text class="summary-label">BMI</text>
           <text class="summary-value">{{ stats.bmi ?? '--' }}</text>
           <text v-if="bmiReady" class="summary-note">{{ stats.bmiLabel }}</text>
@@ -391,12 +395,12 @@ function getChinaDateTimeParts(date: Date) {
             设置身高
           </button>
         </view>
-        <view class="summary-item">
+        <view class="summary-item goal-card">
           <text class="summary-label">目标体重</text>
           <text class="summary-value">{{ targetWeight }}</text>
           <text class="summary-note">{{ stats.targetWeightKg === null ? '未设置' : unitLabel }}</text>
         </view>
-        <view class="summary-item">
+        <view class="summary-item distance-card">
           <text class="summary-label">距离目标</text>
           <text class="summary-value">{{ targetDistance }}</text>
           <text class="summary-note">{{ stats.distanceToTargetKg === null ? '未计算' : unitLabel }}</text>
@@ -404,10 +408,12 @@ function getChinaDateTimeParts(date: Date) {
       </view>
 
       <button class="record-button" hover-class="record-button-pressed" @click="openCreateRecord">
-        记录体重
+        <text class="i-carbon-add" />
+        <text>记录体重</text>
       </button>
 
-      <view class="section trend-section">
+      <text class="ios-section-title">数据趋势</text>
+      <view class="section ios-card trend-section">
         <view class="section-head">
           <text class="section-title">趋势</text>
           <view class="metric-switch">
@@ -435,9 +441,10 @@ function getChinaDateTimeParts(date: Date) {
         </view>
       </view>
 
-      <view class="section">
+      <text class="ios-section-title">历史记录</text>
+      <view class="section ios-card history-section">
         <view class="section-head">
-          <text class="section-title">历史记录</text>
+          <text class="section-title">全部记录</text>
           <text class="section-count">{{ total }} 条</text>
         </view>
         <view v-if="records.length === 0" class="empty-list">
@@ -455,10 +462,12 @@ function getChinaDateTimeParts(date: Date) {
             </view>
             <view class="record-actions">
               <button hover-class="mini-button-pressed" @click="openEditRecord(record)">
-                编辑
+                <text class="i-carbon-edit" />
+                <text>编辑</text>
               </button>
               <button class="danger" hover-class="mini-button-pressed" @click="confirmDelete(record)">
-                删除
+                <text class="i-carbon-trash-can" />
+                <text>删除</text>
               </button>
             </view>
           </view>
@@ -474,553 +483,398 @@ function getChinaDateTimeParts(date: Date) {
 
     <view v-if="recordModalVisible" class="modal-mask" @click.self="closeRecordModal">
       <view class="sheet">
+        <view class="sheet-grabber" />
         <view class="sheet-head">
+          <button class="toolbar-button" @click="closeRecordModal">
+            取消
+          </button>
           <text class="sheet-title">{{ editingRecord ? '编辑体重' : '记录体重' }}</text>
-          <button class="close-button" @click="closeRecordModal">
-            关闭
+          <button class="toolbar-button primary" :disabled="savingRecord" @click="saveRecord">
+            {{ savingRecord ? '保存中' : '保存' }}
           </button>
         </view>
         <view class="weight-input-row">
           <input v-model="recordForm.weight" class="weight-input" type="digit" :maxlength="6" focus placeholder="0.0">
           <text>{{ unitLabel }}</text>
         </view>
-        <view class="form-row">
-          <text class="form-label">测量日期</text>
-          <picker mode="date" :value="recordForm.date" @change="handleRecordDateChange">
-            <view class="picker-value">
-              {{ recordForm.date }}
-            </view>
-          </picker>
+        <view class="form-group">
+          <view class="form-row">
+            <text class="form-label">测量日期</text>
+            <picker mode="date" :value="recordForm.date" @change="handleRecordDateChange">
+              <view class="picker-value">
+                {{ recordForm.date }}
+              </view>
+            </picker>
+          </view>
+          <view class="form-row">
+            <text class="form-label">测量时间</text>
+            <picker mode="time" :value="recordForm.time" @change="handleRecordTimeChange">
+              <view class="picker-value">
+                {{ recordForm.time }}
+              </view>
+            </picker>
+          </view>
         </view>
-        <view class="form-row">
-          <text class="form-label">测量时间</text>
-          <picker mode="time" :value="recordForm.time" @change="handleRecordTimeChange">
-            <view class="picker-value">
-              {{ recordForm.time }}
-            </view>
-          </picker>
-        </view>
-        <button class="sheet-save" :disabled="savingRecord" hover-class="save-pressed" @click="saveRecord">
-          {{ savingRecord ? '保存中' : '保存记录' }}
-        </button>
       </view>
     </view>
 
     <view v-if="settingsModalVisible" class="modal-mask" @click.self="closeSettingsModal">
       <view class="sheet">
+        <view class="sheet-grabber" />
         <view class="sheet-head">
+          <button class="toolbar-button" @click="closeSettingsModal">
+            取消
+          </button>
           <text class="sheet-title">体重设置</text>
-          <button class="close-button" @click="closeSettingsModal">
-            关闭
+          <button class="toolbar-button primary" :disabled="savingSettings" @click="saveSettings">
+            {{ savingSettings ? '保存中' : '保存' }}
           </button>
         </view>
-        <view class="form-row input-form-row">
-          <text class="form-label">身高</text>
-          <view class="inline-input">
-            <input v-model="settingsForm.heightCm" type="digit" :maxlength="5" placeholder="未设置">
-            <text>cm</text>
+        <view class="form-group settings-group">
+          <view class="form-row input-form-row">
+            <text class="form-label">身高</text>
+            <view class="inline-input">
+              <input v-model="settingsForm.heightCm" type="digit" :maxlength="5" placeholder="未设置">
+              <text>cm</text>
+            </view>
+          </view>
+          <view class="form-row input-form-row">
+            <text class="form-label">目标体重</text>
+            <view class="inline-input">
+              <input v-model="settingsForm.targetWeight" type="digit" :maxlength="6" placeholder="未设置">
+              <text>{{ settingsForm.weightUnit === 'jin' ? '斤' : 'kg' }}</text>
+            </view>
+          </view>
+          <view class="form-row unit-row">
+            <text class="form-label">显示单位</text>
+            <view class="unit-switch">
+              <button :class="{ active: settingsForm.weightUnit === 'kg' }" @click="selectSettingsUnit('kg')">
+                kg
+              </button>
+              <button :class="{ active: settingsForm.weightUnit === 'jin' }" @click="selectSettingsUnit('jin')">
+                斤
+              </button>
+            </view>
           </view>
         </view>
-        <view class="form-row input-form-row">
-          <text class="form-label">目标体重</text>
-          <view class="inline-input">
-            <input v-model="settingsForm.targetWeight" type="digit" :maxlength="6" placeholder="未设置">
-            <text>{{ settingsForm.weightUnit === 'jin' ? '斤' : 'kg' }}</text>
-          </view>
-        </view>
-        <view class="form-row unit-row">
-          <text class="form-label">显示单位</text>
-          <view class="unit-switch">
-            <button :class="{ active: settingsForm.weightUnit === 'kg' }" @click="selectSettingsUnit('kg')">
-              kg
-            </button>
-            <button :class="{ active: settingsForm.weightUnit === 'jin' }" @click="selectSettingsUnit('jin')">
-              斤
-            </button>
-          </view>
-        </view>
-        <button class="sheet-save" :disabled="savingSettings" hover-class="save-pressed" @click="saveSettings">
-          {{ savingSettings ? '保存中' : '保存设置' }}
-        </button>
       </view>
     </view>
   </view>
 </template>
 
 <style scoped lang="scss">
+/* Apple Health inspired presentation layer. */
 .weight-page {
-  min-height: 100vh;
-  padding: 28rpx 28rpx 150rpx;
-  color: #0f172a;
-  background: linear-gradient(180deg, #ecfdf5 0%, #f8fafc 42%, #ffffff 100%);
-  box-sizing: border-box;
+  padding: 0 0 calc(150rpx + env(safe-area-inset-bottom));
+  color: var(--app-label-primary);
+  background: var(--app-bg);
 }
 
-button::after {
-  border: 0;
+.hero,
+.summary-grid,
+.record-button,
+.section,
+.state-panel {
+  margin-right: var(--app-gutter);
+  margin-left: var(--app-gutter);
 }
 
 .hero {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24rpx;
   padding: 30rpx;
-  border: 1px solid #a7f3d0;
-  border-radius: 16rpx;
-  background: #ffffff;
-  box-shadow: 0 18rpx 40rpx rgba(15, 118, 110, 0.12);
-  animation: enter 240ms ease-out both;
+  border: 0;
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
 }
 
-.hero.pulse {
-  animation: success-pop 280ms ease-out both;
-}
-.hero-main {
-  min-width: 0;
-}
 .hero-label,
-.summary-label {
-  color: #64748b;
-  font-size: 24rpx;
-}
-.weight-value {
-  display: flex;
-  align-items: baseline;
-  gap: 10rpx;
-  margin-top: 8rpx;
-}
-.weight-number {
-  color: #047857;
-  font-size: 72rpx;
-  font-weight: 800;
-  line-height: 1.15;
-}
-.weight-unit {
-  color: #047857;
-  font-size: 28rpx;
-  font-weight: 700;
-}
-.hero-change {
-  display: block;
-  margin-top: 12rpx;
-  color: #475569;
-  font-size: 24rpx;
-}
-
-.settings-button,
-.retry-button {
-  min-width: 104rpx;
-  height: 72rpx;
-  padding: 0 20rpx;
-  color: #047857;
-  background: #d1fae5;
-  border-radius: 999rpx;
-  font-size: 26rpx;
-  line-height: 72rpx;
-  transition:
-    transform 160ms ease-out,
-    opacity 160ms ease-out;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
-  margin-top: 20rpx;
-  animation: enter 240ms 45ms ease-out both;
-}
-
-.summary-item {
-  min-width: 0;
-  padding: 22rpx 14rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.94);
-  text-align: center;
-}
-
-.summary-value {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 34rpx;
-  font-weight: 800;
-}
-.summary-note {
-  display: block;
-  margin-top: 6rpx;
-  color: #64748b;
-  font-size: 20rpx;
-}
-
-.record-button {
-  height: 96rpx;
-  margin-top: 24rpx;
-  color: #ffffff;
-  background: linear-gradient(145deg, #10b981, #0f766e);
-  border-radius: 16rpx;
-  box-shadow:
-    0 18rpx 34rpx rgba(15, 118, 110, 0.22),
-    inset 0 4rpx 0 rgba(255, 255, 255, 0.2);
-  font-size: 32rpx;
-  font-weight: 800;
-  line-height: 96rpx;
-  transition:
-    transform 160ms ease-out,
-    opacity 160ms ease-out;
-  animation: enter 240ms 75ms ease-out both;
-}
-
-.record-button-pressed {
-  opacity: 0.9;
-  transform: translateY(3rpx) scale(0.99);
-}
-.control-pressed,
-.mini-button-pressed,
-.save-pressed {
-  opacity: 0.86;
-  transform: scale(0.97);
-}
-
-.section {
-  margin-top: 24rpx;
-  padding: 28rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.96);
-  animation: enter 260ms 105ms ease-out both;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-}
-.section-title {
-  font-size: 32rpx;
-  font-weight: 800;
-}
-.section-count {
-  color: #64748b;
-  font-size: 24rpx;
-}
-.metric-switch,
-.range-switch,
-.unit-switch {
-  display: flex;
-  padding: 4rpx;
-  border-radius: 14rpx;
-  background: #f1f5f9;
-}
-.metric-switch button,
-.range-switch button,
-.unit-switch button {
-  min-width: 88rpx;
-  height: 60rpx;
-  padding: 0 18rpx;
-  color: #64748b;
-  background: transparent;
-  border-radius: 12rpx;
-  font-size: 24rpx;
-  line-height: 60rpx;
-}
-.metric-switch button.active,
-.range-switch button.active,
-.unit-switch button.active {
-  color: #047857;
-  background: #ffffff;
-  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.08);
-  font-weight: 700;
-}
-.metric-switch button.disabled {
-  opacity: 0.48;
-}
-.range-switch {
-  margin-top: 22rpx;
-}
-.range-switch button {
-  flex: 1;
-}
-.chart-box {
-  height: 380rpx;
-  margin-top: 18rpx;
-}
+.summary-label,
+.hero-change,
+.summary-note,
+.section-count,
+.record-date,
+.record-bmi,
+.list-end,
 .chart-empty,
 .chart-loading,
 .empty-list {
-  padding: 70rpx 20rpx;
-  color: #64748b;
-  font-size: 26rpx;
-  text-align: center;
+  color: var(--app-label-secondary);
+}
+
+.weight-number,
+.weight-unit {
+  color: var(--app-blue);
+  font-variant-numeric: tabular-nums;
+}
+
+.weight-number {
+  font-size: 76rpx;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
+.settings-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76rpx;
+  width: 76rpx;
+  height: 76rpx;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
+  font-size: 32rpx;
+  line-height: 76rpx;
+}
+
+.summary-grid {
+  gap: 14rpx;
+}
+
+.summary-item {
+  padding: 24rpx 12rpx;
+  border: 0;
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.summary-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.bmi-card .summary-value {
+  color: var(--app-orange);
+}
+
+.goal-card .summary-value {
+  color: var(--app-pink);
+}
+
+.distance-card .summary-value {
+  color: var(--app-blue);
+}
+
+.height-action {
+  color: var(--app-orange);
+}
+
+.record-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  height: 94rpx;
+  border-radius: var(--app-control-radius);
+  color: #fff;
+  background: var(--app-green);
+  box-shadow: 0 10rpx 24rpx rgba(52, 199, 89, 0.18);
+  font-size: 30rpx;
+  line-height: 94rpx;
+}
+
+.section {
+  margin-top: 0;
+  padding: 28rpx;
+  border: 0;
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+}
+
+.metric-switch,
+.range-switch,
+.unit-switch {
+  background: var(--app-fill);
+}
+
+.metric-switch button,
+.range-switch button,
+.unit-switch button {
+  color: var(--app-label-secondary);
+  background: transparent;
+}
+
+.metric-switch button.active,
+.range-switch button.active,
+.unit-switch button.active {
+  color: var(--app-label-primary);
+  background: var(--app-surface);
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+}
+
+.chart-box {
+  height: 350rpx;
+}
+
+.history-section {
+  padding: 0;
+  overflow: hidden;
+}
+
+.history-section .section-head {
+  min-height: 88rpx;
+  padding: 0 28rpx;
+  border-bottom: 1rpx solid var(--app-separator);
 }
 
 .record-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-  margin-top: 22rpx;
+  gap: 0;
+  margin-top: 0;
 }
+
 .record-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12rpx 20rpx;
-  align-items: center;
-  padding: 22rpx;
-  border-radius: 14rpx;
-  background: #f8fafc;
-  animation: item-enter 220ms ease-out both;
-}
-.record-data {
-  min-width: 0;
-}
-.record-weight {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 800;
-}
-.record-date {
-  display: block;
-  margin-top: 6rpx;
-  color: #64748b;
-  font-size: 22rpx;
-}
-.record-bmi {
-  display: flex;
-  align-items: baseline;
-  gap: 8rpx;
-  color: #64748b;
-  font-size: 22rpx;
-}
-.record-bmi-value {
-  color: #0f766e;
-  font-size: 30rpx;
-  font-weight: 700;
-}
-.height-action {
-  height: 48rpx;
-  margin-top: 4rpx;
-  padding: 0 10rpx;
-  color: #047857;
+  margin-left: 28rpx;
+  padding: 22rpx 24rpx 22rpx 0;
+  border-bottom: 1rpx solid var(--app-separator);
+  border-radius: 0;
   background: transparent;
-  font-size: 20rpx;
-  line-height: 48rpx;
 }
-.record-actions {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12rpx;
+
+.record-item:last-child {
+  border-bottom: 0;
 }
+
+.record-weight,
+.record-bmi-value {
+  color: var(--app-label-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.record-bmi-value {
+  color: var(--app-orange);
+}
+
 .record-actions button {
-  min-width: 92rpx;
-  height: 60rpx;
-  padding: 0 18rpx;
-  color: #0f766e;
-  background: #ccfbf1;
-  border-radius: 12rpx;
-  font-size: 24rpx;
-  line-height: 60rpx;
-  transition:
-    transform 150ms ease-out,
-    opacity 150ms ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
 }
+
 .record-actions button.danger {
-  color: #b91c1c;
-  background: #fee2e2;
+  color: var(--app-red);
+  background: var(--app-pink-soft);
 }
-.load-more {
-  height: 76rpx;
-  margin-top: 22rpx;
-  color: #047857;
-  background: #d1fae5;
-  border-radius: 14rpx;
-  font-size: 26rpx;
-  line-height: 76rpx;
-}
-.list-end {
-  padding-top: 24rpx;
-  color: #94a3b8;
-  font-size: 22rpx;
-  text-align: center;
+
+.load-more,
+.retry-button {
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
 }
 
 .state-panel {
-  margin-top: 120rpx;
-  padding: 48rpx;
-  border-radius: 16rpx;
-  background: #ffffff;
-  text-align: center;
+  margin-top: 80rpx;
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
 }
+
 .state-panel text {
-  display: block;
-  margin-bottom: 24rpx;
-  color: #475569;
-}
-.retry-button {
-  margin: 0 auto;
+  color: var(--app-label-secondary);
 }
 
 .modal-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: flex;
-  align-items: flex-end;
-  background: rgba(15, 23, 42, 0.52);
-  animation: fade-in 180ms ease-out both;
-}
-.sheet {
-  width: 100%;
-  padding: 30rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
-  border-radius: 16rpx 16rpx 0 0;
-  background: #ffffff;
-  box-sizing: border-box;
-  animation: sheet-enter 240ms ease-out both;
-}
-.sheet-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-.sheet-title {
-  font-size: 34rpx;
-  font-weight: 800;
-}
-.close-button {
-  min-width: 88rpx;
-  height: 64rpx;
-  padding: 0 16rpx;
-  color: #64748b;
-  background: #f1f5f9;
-  border-radius: 12rpx;
-  font-size: 24rpx;
-  line-height: 64rpx;
-}
-.weight-input-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 14rpx;
-  margin: 34rpx 0 22rpx;
-}
-.weight-input {
-  width: 260rpx;
-  height: 100rpx;
-  border-bottom: 3rpx solid #10b981;
-  color: #0f172a;
-  font-size: 64rpx;
-  font-weight: 800;
-  text-align: center;
-}
-.weight-input-row > text {
-  color: #047857;
-  font-size: 30rpx;
-  font-weight: 700;
-}
-.form-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 96rpx;
-  border-bottom: 1px solid #f1f5f9;
-}
-.form-label {
-  color: #334155;
-  font-size: 28rpx;
-  font-weight: 600;
-}
-.picker-value {
-  min-width: 220rpx;
-  padding: 26rpx 0;
-  color: #0f172a;
-  font-size: 28rpx;
-  text-align: right;
-}
-.inline-input {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  color: #64748b;
-  font-size: 26rpx;
-}
-.inline-input input {
-  width: 220rpx;
-  height: 80rpx;
-  color: #0f172a;
-  font-size: 28rpx;
-  text-align: right;
-}
-.unit-row {
-  border-bottom: 0;
-}
-.sheet-save {
-  height: 92rpx;
-  margin-top: 30rpx;
-  color: #ffffff;
-  background: #059669;
-  border-radius: 16rpx;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 92rpx;
-  transition:
-    transform 160ms ease-out,
-    opacity 160ms ease-out;
-}
-.sheet-save[disabled] {
-  opacity: 0.48;
+  background: var(--app-mask);
 }
 
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(16rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.sheet {
+  max-height: 88vh;
+  padding: 14rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
+  border-radius: 30rpx 30rpx 0 0;
+  color: var(--app-label-primary);
+  background: var(--app-surface-secondary);
 }
-@keyframes item-enter {
-  from {
-    opacity: 0;
-    transform: translateY(12rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+
+.sheet-grabber {
+  width: 74rpx;
+  height: 10rpx;
+  margin: 0 auto 12rpx;
+  border-radius: 999rpx;
+  background: var(--app-fill-strong);
 }
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+
+.sheet-head {
+  min-height: 72rpx;
 }
-@keyframes sheet-enter {
-  from {
-    opacity: 0;
-    transform: translateY(40rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+
+.sheet-title {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 700;
+  text-align: center;
 }
-@keyframes success-pop {
-  0% {
-    opacity: 0.88;
-    transform: scale(0.98);
-  }
-  70% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-  100% {
-    transform: scale(1);
-  }
+
+.toolbar-button {
+  min-width: 112rpx;
+  height: 64rpx;
+  padding: 0 8rpx;
+  color: var(--app-blue);
+  background: transparent;
+  font-size: 27rpx;
+  line-height: 64rpx;
+}
+
+.toolbar-button:first-child {
+  text-align: left;
+}
+
+.toolbar-button.primary {
+  font-weight: 650;
+  text-align: right;
+}
+
+.toolbar-button[disabled] {
+  color: var(--app-label-tertiary);
+}
+
+.weight-input-row {
+  margin: 30rpx 0 26rpx;
+}
+
+.weight-input {
+  border-bottom-color: var(--app-blue);
+  color: var(--app-label-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.weight-input-row > text {
+  color: var(--app-blue);
+}
+
+.form-group {
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  overflow: hidden;
+}
+
+.settings-group {
+  margin-top: 26rpx;
+}
+
+.form-row {
+  min-height: 102rpx;
+  margin-left: 28rpx;
+  padding-right: 28rpx;
+  border-bottom-color: var(--app-separator);
+}
+
+.form-row:last-child {
+  border-bottom: 0;
+}
+
+.form-label {
+  color: var(--app-label-primary);
+}
+
+.picker-value,
+.inline-input input {
+  color: var(--app-label-primary);
+}
+
+.inline-input {
+  color: var(--app-label-secondary);
 }
 </style>

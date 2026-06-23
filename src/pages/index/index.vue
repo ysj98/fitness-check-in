@@ -2,6 +2,7 @@
 import type { CheckInRecord, CheckInStatsRes, MonthCheckInRes } from '@/api/checkins'
 import { createCheckIn, deleteCheckIn, getCheckInStats, getMonthCheckIns, getRecentCheckIns, getTodayCheckIns } from '@/api/checkins'
 import { useTokenStore } from '@/store'
+import { triggerSuccessHaptic } from '@/utils/haptics'
 
 defineOptions({
   name: 'Home',
@@ -10,9 +11,8 @@ defineOptions({
 definePage({
   type: 'home',
   style: {
+    navigationStyle: 'custom',
     navigationBarTitleText: '运动打卡',
-    navigationBarBackgroundColor: '#ecfdf5',
-    navigationBarTextStyle: 'black',
   },
 })
 
@@ -48,6 +48,7 @@ const todayRecords = ref<CheckInRecord[]>([])
 const recentRecords = ref<CheckInRecord[]>([])
 const monthStats = ref<MonthCheckInRes>({ month: getMonthKey(), days: {} })
 const checkInStats = ref<CheckInStatsRes>({ ...emptyStats })
+const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
 
 const todayLabel = computed(() => {
   const date = new Date()
@@ -79,11 +80,10 @@ const calendarDays = computed<CalendarDay[]>(() => {
   })
 })
 
-const heroHint = computed(() => {
-  if (checkInStats.value.currentStreak > 0) {
-    return `连续 ${checkInStats.value.currentStreak} 天`
-  }
-  return '今日打卡'
+const calendarStartOffset = computed(() => {
+  const [year, month] = monthStats.value.month.split('-').map(Number)
+  const day = new Date(year, month - 1, 1).getDay()
+  return day === 0 ? 6 : day - 1
 })
 
 const goalPercent = computed(() => {
@@ -97,6 +97,10 @@ const goalText = computed(() => {
   }
   return `还差 ${Math.max((checkInStats.value.todayGoal || 1) - todayCount.value, 0)} 次达成`
 })
+
+const goalRingStyle = computed(() => ({
+  background: `conic-gradient(var(--app-green) ${goalPercent.value}%, var(--app-fill) ${goalPercent.value}% 100%)`,
+}))
 
 onLoad(() => {
   initPage()
@@ -194,6 +198,7 @@ async function handleCheckIn() {
     ])
     monthStats.value = month
     checkInStats.value = stats
+    triggerSuccessHaptic()
     uni.showToast({
       title: stats.todayCompleted ? '今日目标达成' : '打卡成功',
       icon: 'success',
@@ -249,84 +254,67 @@ function formatRecordDate(value: string) {
 </script>
 
 <template>
-  <view class="checkin-page" :class="{ ready: pageReady }">
-    <view class="hero">
-      <view>
-        <view class="eyebrow">
-          {{ todayLabel }}
-        </view>
-        <view class="title">
-          运动打卡
-        </view>
-        <view class="subtitle">
-          {{ heroHint }}
-        </view>
-      </view>
-      <view class="count-pill" :class="{ bump: successPulse }">
-        <text class="count-number">
-          {{ checkInStats.currentStreak }}
-        </text>
-        <text class="count-label">
-          连续天数
-        </text>
-      </view>
-    </view>
+  <view class="app-page checkin-page" :class="{ ready: pageReady }">
+    <ios-page-header title="运动" :subtitle="todayLabel" />
 
-    <view class="action-section">
-      <button
-        class="checkin-button"
-        :class="{ checking, success: successPulse }"
-        :disabled="checking || loading"
-        hover-class="checkin-button-pressed"
-        @click="handleCheckIn"
-      >
-        <text class="button-main">
-          {{ checking ? '记录中' : '立即打卡' }}
-        </text>
-        <text class="button-sub">
-          今日第 {{ todayCount + 1 }} 次
-        </text>
-      </button>
-      <view v-if="successPulse" class="success-ring" />
-    </view>
-
-    <view class="goal-card" :class="{ completed: checkInStats.todayCompleted, pulse: successPulse && checkInStats.todayCompleted }">
-      <view class="goal-head">
+    <view class="activity-card ios-card" :class="{ pulse: successPulse }">
+      <view class="activity-head">
         <view>
-          <text class="goal-title">
-            今日目标
-          </text>
-          <text class="goal-status">
-            {{ goalText }}
-          </text>
+          <text class="activity-label">连续打卡</text>
+          <view class="streak-value numeric">
+            <text>{{ checkInStats.currentStreak }}</text>
+            <text class="streak-unit">天</text>
+          </view>
         </view>
-        <view class="goal-count">
-          {{ todayCount }}/{{ checkInStats.todayGoal || 1 }}
+        <view class="goal-copy">
+          <text class="goal-caption">今日目标</text>
+          <text class="goal-fraction numeric">{{ todayCount }}/{{ checkInStats.todayGoal || 1 }}</text>
+          <text class="goal-status">{{ goalText }}</text>
         </view>
       </view>
-      <view class="goal-track">
-        <view class="goal-progress" :style="{ width: `${goalPercent}%` }" />
+
+      <view class="action-area">
+        <view class="goal-ring" :style="goalRingStyle">
+          <view class="goal-ring-inner">
+            <text class="ring-percent numeric">{{ goalPercent }}%</text>
+            <text class="ring-label">完成度</text>
+          </view>
+        </view>
+        <view class="checkin-action">
+          <button
+            class="checkin-button"
+            :class="{ checking, success: successPulse }"
+            :disabled="checking || loading"
+            hover-class="checkin-button-pressed"
+            @click="handleCheckIn"
+          >
+            <text class="button-main">{{ checking ? '记录中' : '立即打卡' }}</text>
+            <text class="button-sub">今日第 {{ todayCount + 1 }} 次</text>
+          </button>
+          <view v-if="successPulse" class="success-ring" />
+        </view>
       </view>
     </view>
 
-    <view class="section">
-      <view class="section-head month-head">
-        <button class="month-button" @click="changeMonth(-1)">
-          上月
+    <text class="ios-section-title">月度记录</text>
+    <view class="calendar-card ios-card">
+      <view class="calendar-head">
+        <button class="icon-button" aria-label="上个月" hover-class="icon-button-pressed" @click="changeMonth(-1)">
+          <text class="i-carbon-chevron-left" />
         </button>
         <view class="month-title-wrap" @click="backToCurrentMonth">
-          <text class="section-title">
-            {{ monthTitle }}
-          </text>
-          <text class="section-note">
-            月度概览
-          </text>
+          <text class="month-title">{{ monthTitle }}</text>
+          <text class="month-note">点按返回本月</text>
         </view>
-        <button class="month-button" @click="changeMonth(1)">
-          下月
+        <button class="icon-button" aria-label="下个月" hover-class="icon-button-pressed" @click="changeMonth(1)">
+          <text class="i-carbon-chevron-right" />
         </button>
       </view>
-      <view class="calendar-grid">
+      <view class="calendar-grid week-row">
+        <text v-for="label in weekLabels" :key="label" class="week-label">{{ label }}</text>
+      </view>
+      <view class="calendar-grid days-grid">
+        <view v-for="index in calendarStartOffset" :key="`blank-${index}`" class="calendar-day placeholder" />
         <view
           v-for="day in calendarDays"
           :key="day.key"
@@ -334,64 +322,46 @@ function formatRecordDate(value: string) {
           :class="{ active: day.count > 0, today: day.isToday }"
         >
           <text>{{ day.day }}</text>
-          <view v-if="day.count > 0" class="day-dot">
+          <view v-if="day.count > 0" class="day-count numeric">
             {{ day.count }}
           </view>
         </view>
       </view>
     </view>
 
-    <view class="section">
-      <view class="section-head">
-        <text class="section-title">
-          今日记录
-        </text>
-        <text class="section-note">
-          {{ todayCount }} 次
-        </text>
-      </view>
+    <text class="ios-section-title">今日记录</text>
+    <view class="record-group ios-card">
       <view v-if="todayRecords.length === 0" class="empty-state">
         暂无记录
       </view>
-      <view v-else class="record-list">
-        <view
-          v-for="(record, index) in todayRecords"
-          :key="record.id"
-          class="record-item"
-          :style="{ animationDelay: `${index * 35}ms` }"
-        >
-          <view>
-            <view class="record-time">
-              {{ formatTime(record.checkedAt) }}
-            </view>
-            <view class="record-label">
-              运动打卡
-            </view>
-          </view>
-          <button class="delete-button" @click="handleDelete(record)">
-            删除
-          </button>
+      <view
+        v-for="(record, index) in todayRecords"
+        v-else
+        :key="record.id"
+        class="record-row"
+        :style="{ animationDelay: `${index * 35}ms` }"
+      >
+        <view class="record-icon green-icon">
+          <text class="i-carbon-checkmark" />
         </view>
+        <view class="record-main">
+          <text class="record-title">运动打卡</text>
+          <text class="record-detail">{{ formatTime(record.checkedAt) }}</text>
+        </view>
+        <button class="row-action danger" hover-class="row-action-pressed" @click="handleDelete(record)">
+          删除
+        </button>
       </view>
     </view>
 
-    <view class="section">
-      <view class="section-head">
-        <text class="section-title">
-          最近打卡
-        </text>
-        <text class="section-note">
-          最近 12 次
-        </text>
-      </view>
+    <text class="ios-section-title">最近记录</text>
+    <view class="record-group ios-card">
       <view v-if="recentRecords.length === 0" class="empty-state">
         暂无记录
       </view>
-      <view v-else class="recent-list">
-        <view v-for="record in recentRecords" :key="record.id" class="recent-item">
-          <text>{{ formatRecordDate(record.checkedAt) }}</text>
-          <text>{{ formatTime(record.checkedAt) }}</text>
-        </view>
+      <view v-for="record in recentRecords" v-else :key="record.id" class="recent-row">
+        <text class="recent-date">{{ formatRecordDate(record.checkedAt) }}</text>
+        <text class="recent-time numeric">{{ formatTime(record.checkedAt) }}</text>
       </view>
     </view>
   </view>
@@ -399,108 +369,154 @@ function formatRecordDate(value: string) {
 
 <style scoped lang="scss">
 .checkin-page {
-  min-height: 100vh;
-  padding: 28rpx 28rpx 150rpx;
-  background: linear-gradient(180deg, #ecfdf5 0%, #f8fafc 46%, #ffffff 100%);
-  color: #0f172a;
-  box-sizing: border-box;
+  padding-right: 0;
+  padding-left: 0;
 }
 
-.hero,
-.action-section,
-.goal-card,
-.section {
+button::after {
+  border: 0;
+}
+
+.activity-card,
+.calendar-card,
+.record-group {
+  margin-right: var(--app-gutter);
+  margin-left: var(--app-gutter);
   opacity: 0;
-  transform: translateY(18rpx);
+  transform: translateY(16rpx);
 }
 
-.ready .hero {
-  animation: page-enter 240ms ease-out both;
+.ready .activity-card {
+  animation: content-enter var(--app-motion-normal) ease-out both;
 }
 
-.ready .action-section {
-  animation: page-enter 260ms ease-out 45ms both;
+.ready .calendar-card {
+  animation: content-enter var(--app-motion-normal) 50ms ease-out both;
 }
 
-.ready .goal-card {
-  animation: page-enter 260ms ease-out 75ms both;
+.ready .record-group {
+  animation: content-enter var(--app-motion-normal) 90ms ease-out both;
 }
 
-.ready .section {
-  animation: page-enter 260ms ease-out 115ms both;
+.activity-card {
+  padding: 30rpx;
+  overflow: hidden;
 }
 
-.ready .section:nth-of-type(4) {
-  animation-delay: 125ms;
+.activity-card.pulse {
+  animation: success-pop 280ms ease-out both;
 }
 
-.ready .section:nth-of-type(5) {
-  animation-delay: 160ms;
-}
-
-.hero {
+.activity-head,
+.action-area,
+.calendar-head,
+.record-row,
+.recent-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24rpx;
-  padding: 20rpx 0 28rpx;
 }
 
-.eyebrow {
-  color: #047857;
+.activity-head {
+  justify-content: space-between;
+  gap: 28rpx;
+}
+
+.activity-label,
+.goal-caption,
+.goal-status,
+.ring-label,
+.record-detail,
+.recent-time,
+.month-note {
+  color: var(--app-label-secondary);
+}
+
+.activity-label,
+.goal-caption {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.streak-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+  margin-top: 4rpx;
+  color: var(--app-green);
+  font-size: 64rpx;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.streak-unit {
   font-size: 26rpx;
   font-weight: 600;
 }
 
-.title {
-  margin-top: 8rpx;
-  font-size: 48rpx;
-  font-weight: 800;
-  line-height: 1.2;
+.goal-copy {
+  min-width: 190rpx;
+  text-align: right;
 }
 
-.subtitle {
-  margin-top: 12rpx;
-  color: #475569;
-  font-size: 28rpx;
+.goal-fraction,
+.goal-status {
+  display: block;
 }
 
-.count-pill {
+.goal-fraction {
+  margin-top: 5rpx;
+  font-size: 36rpx;
+  font-weight: 750;
+}
+
+.goal-status {
+  margin-top: 3rpx;
+  font-size: 22rpx;
+}
+
+.action-area {
+  justify-content: space-between;
+  gap: 34rpx;
+  margin-top: 32rpx;
+  padding-top: 28rpx;
+  border-top: 1rpx solid var(--app-separator);
+}
+
+.goal-ring {
   flex: 0 0 auto;
+  width: 176rpx;
+  height: 176rpx;
+  padding: 14rpx;
+  border-radius: 50%;
+  box-sizing: border-box;
+  transition: background-color var(--app-motion-normal) ease-out;
+}
+
+.goal-ring-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 148rpx;
-  height: 148rpx;
-  border-radius: 32rpx;
-  background: #ffffff;
-  box-shadow: 0 18rpx 42rpx rgba(15, 118, 110, 0.14);
-  transition: transform 180ms ease-out;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--app-surface);
 }
 
-.count-pill.bump {
-  animation: count-bump 260ms ease-out;
+.ring-percent {
+  font-size: 34rpx;
+  font-weight: 750;
 }
 
-.count-number {
-  color: #059669;
-  font-size: 52rpx;
-  font-weight: 800;
-  line-height: 1;
+.ring-label {
+  margin-top: 2rpx;
+  font-size: 20rpx;
 }
 
-.count-label {
-  margin-top: 10rpx;
-  color: #64748b;
-  font-size: 22rpx;
-}
-
-.action-section {
+.checkin-action {
   position: relative;
-  display: flex;
-  justify-content: center;
-  padding: 24rpx 0 36rpx;
+  flex: 1;
 }
 
 .checkin-button {
@@ -510,203 +526,121 @@ function formatRecordDate(value: string) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 340rpx;
-  height: 340rpx;
+  width: 100%;
+  height: 138rpx;
   padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: #ffffff;
-  background: linear-gradient(145deg, #10b981, #0f766e);
-  box-shadow: 0 26rpx 60rpx rgba(15, 118, 110, 0.28);
-  animation: breathe 2100ms ease-in-out infinite;
-  transform: translateZ(0);
-  overflow: hidden;
-}
-
-.checkin-button::after {
-  border: 0;
-  border-radius: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0));
-  pointer-events: none;
-}
-
-.checkin-button::before {
-  content: '';
-  position: absolute;
-  inset: 28rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  opacity: 0;
-  transform: scale(0.72);
+  border-radius: 30rpx;
+  color: #fff;
+  background: var(--app-green);
+  box-shadow:
+    0 12rpx 0 rgba(20, 120, 48, 0.82),
+    0 20rpx 30rpx rgba(52, 199, 89, 0.2),
+    inset 0 3rpx 0 rgba(255, 255, 255, 0.26);
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    box-shadow var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out;
 }
 
 .checkin-button-pressed,
 .checkin-button.checking {
-  transform: scale(0.96);
-  opacity: 0.92;
-}
-
-.checkin-button-pressed::before,
-.checkin-button.checking::before {
-  animation: tap-ripple 260ms ease-out;
+  opacity: 0.9;
+  transform: translateY(8rpx) scale(0.99);
+  box-shadow:
+    0 4rpx 0 rgba(20, 120, 48, 0.82),
+    0 8rpx 16rpx rgba(52, 199, 89, 0.16),
+    inset 0 2rpx 0 rgba(255, 255, 255, 0.18);
 }
 
 .checkin-button.success {
-  animation: success-pop 280ms ease-out;
+  animation: button-pop 280ms ease-out;
 }
 
 .button-main {
-  font-size: 44rpx;
-  font-weight: 800;
+  font-size: 34rpx;
+  font-weight: 750;
 }
 
 .button-sub {
-  margin-top: 12rpx;
-  font-size: 24rpx;
+  margin-top: 6rpx;
+  font-size: 22rpx;
   opacity: 0.82;
 }
 
 .success-ring {
   position: absolute;
-  top: 24rpx;
-  width: 340rpx;
-  height: 340rpx;
-  border-radius: 50%;
-  background: rgba(16, 185, 129, 0.18);
+  inset: 0;
+  border-radius: 30rpx;
+  background: var(--app-green-soft);
   animation: ring-spread 340ms ease-out forwards;
 }
 
-.goal-card {
-  margin-bottom: 24rpx;
-  padding: 26rpx;
-  border: 1px solid #bbf7d0;
-  border-radius: 16rpx;
-  background: rgba(240, 253, 244, 0.95);
-  box-shadow: 0 18rpx 36rpx rgba(15, 118, 110, 0.08);
-  transition:
-    transform 200ms ease-out,
-    border-color 200ms ease-out,
-    background 200ms ease-out;
+.calendar-card {
+  padding: 26rpx 22rpx 24rpx;
 }
 
-.goal-card.completed {
-  border-color: #34d399;
-  background: #ecfdf5;
+.calendar-head {
+  justify-content: space-between;
+  margin-bottom: 18rpx;
 }
 
-.goal-card.pulse {
-  animation: goal-complete 320ms ease-out both;
-}
-
-.goal-head {
+.icon-button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-}
-
-.goal-title,
-.goal-status {
-  display: block;
-}
-
-.goal-title {
-  color: #064e3b;
-  font-size: 30rpx;
-  font-weight: 800;
-}
-
-.goal-status {
-  margin-top: 8rpx;
-  color: #047857;
-  font-size: 24rpx;
-}
-
-.goal-count {
-  flex: 0 0 auto;
-  min-width: 112rpx;
-  height: 64rpx;
-  border-radius: 999rpx;
-  color: #ffffff;
-  background: #059669;
-  font-size: 28rpx;
-  font-weight: 800;
-  line-height: 64rpx;
-  text-align: center;
-}
-
-.goal-track {
-  height: 16rpx;
-  margin-top: 22rpx;
-  border-radius: 999rpx;
-  background: #d1fae5;
-  overflow: hidden;
-}
-
-.goal-progress {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #10b981, #0f766e);
-  transition: width 260ms ease-out;
-}
-
-.section {
-  margin-top: 24rpx;
-  padding: 28rpx;
-  border: 1px solid #e2e8f0;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-  margin-bottom: 22rpx;
-}
-
-.section-title {
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--app-green);
+  background: var(--app-green-soft);
   font-size: 32rpx;
-  font-weight: 700;
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out;
 }
 
-.section-note {
-  color: #64748b;
-  font-size: 24rpx;
-}
-
-.month-head {
-  align-items: center;
+.icon-button-pressed,
+.row-action-pressed {
+  opacity: 0.68;
+  transform: scale(0.94);
 }
 
 .month-title-wrap {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  text-align: center;
 }
 
-.month-button {
-  flex: 0 0 auto;
-  min-width: 104rpx;
-  height: 60rpx;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  color: #047857;
-  background: #d1fae5;
-  font-size: 24rpx;
-  line-height: 60rpx;
+.month-title,
+.month-note {
+  display: block;
 }
 
-.month-button::after {
-  border: 0;
+.month-title {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.month-note {
+  margin-top: 3rpx;
+  font-size: 20rpx;
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 12rpx;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8rpx;
+}
+
+.week-label {
+  color: var(--app-label-tertiary);
+  font-size: 20rpx;
+  font-weight: 600;
+  text-align: center;
+}
+
+.days-grid {
+  margin-top: 10rpx;
 }
 
 .calendar-day {
@@ -714,186 +648,137 @@ function formatRecordDate(value: string) {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 68rpx;
-  border-radius: 14rpx;
-  color: #64748b;
-  font-size: 24rpx;
-  background: #f8fafc;
-  transition:
-    transform 180ms ease-out,
-    opacity 180ms ease-out;
+  min-width: 0;
+  height: 66rpx;
+  border-radius: 50%;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+  background: transparent;
 }
 
 .calendar-day.active {
-  color: #065f46;
-  background: #d1fae5;
+  color: var(--app-green);
+  background: var(--app-green-soft);
+  font-weight: 650;
 }
 
 .calendar-day.today {
-  box-shadow: inset 0 0 0 2rpx #10b981;
+  box-shadow: inset 0 0 0 3rpx var(--app-green);
 }
 
-.day-dot {
+.calendar-day.placeholder {
+  visibility: hidden;
+}
+
+.day-count {
   position: absolute;
-  right: 6rpx;
-  bottom: 6rpx;
-  min-width: 24rpx;
-  height: 24rpx;
-  padding: 0 6rpx;
+  right: -2rpx;
+  bottom: -1rpx;
+  min-width: 26rpx;
+  height: 26rpx;
+  padding: 0 4rpx;
   border-radius: 999rpx;
-  color: #ffffff;
-  background: #059669;
-  font-size: 18rpx;
-  line-height: 24rpx;
+  color: #fff;
+  background: var(--app-green);
+  font-size: 17rpx;
+  line-height: 26rpx;
   text-align: center;
+  box-sizing: border-box;
 }
 
-.empty-state {
-  padding: 28rpx;
-  border-radius: 14rpx;
-  color: #64748b;
-  background: #f8fafc;
-  font-size: 26rpx;
-  text-align: center;
+.record-group {
+  overflow: hidden;
 }
 
-.record-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
+.record-row,
+.recent-row {
+  position: relative;
+  min-height: 104rpx;
+  margin-left: 28rpx;
+  padding: 16rpx 24rpx 16rpx 0;
+  border-bottom: 1rpx solid var(--app-separator);
+  box-sizing: border-box;
 }
 
-.record-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  padding: 20rpx;
-  border-radius: 14rpx;
-  background: #f8fafc;
+.record-row:last-child,
+.recent-row:last-child {
+  border-bottom: 0;
+}
+
+.record-row {
   animation: item-enter 220ms ease-out both;
 }
 
-.record-time {
-  font-size: 32rpx;
-  font-weight: 700;
-}
-
-.record-label {
-  margin-top: 4rpx;
-  color: #64748b;
-  font-size: 24rpx;
-}
-
-.delete-button {
-  flex: 0 0 auto;
-  min-width: 96rpx;
-  height: 56rpx;
-  padding: 0 20rpx;
-  border-radius: 999rpx;
-  color: #0f766e;
-  background: #ccfbf1;
-  font-size: 24rpx;
-  line-height: 56rpx;
-}
-
-.delete-button::after {
-  border: 0;
-}
-
-.recent-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
-}
-
-.recent-item {
+.record-icon {
   display: flex;
-  justify-content: space-between;
-  gap: 12rpx;
-  padding: 18rpx;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 60rpx;
+  height: 60rpx;
+  margin-right: 20rpx;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+}
+
+.green-icon {
+  color: var(--app-green);
+  background: var(--app-green-soft);
+}
+
+.record-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-title,
+.record-detail {
+  display: block;
+}
+
+.record-title,
+.recent-date {
+  font-size: 28rpx;
+  font-weight: 550;
+}
+
+.record-detail,
+.recent-time {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+}
+
+.row-action {
+  min-width: 88rpx;
+  height: 56rpx;
+  padding: 0 16rpx;
   border-radius: 14rpx;
-  color: #334155;
-  background: #f8fafc;
-  font-size: 24rpx;
+  color: var(--app-red);
+  background: var(--app-pink-soft);
+  font-size: 23rpx;
+  line-height: 56rpx;
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out;
 }
 
-@keyframes breathe {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-  }
-
-  50% {
-    transform: translateY(-3rpx) scale(1.02);
-  }
+.recent-row {
+  justify-content: space-between;
 }
 
-@keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateY(18rpx);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.recent-time {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
-@keyframes tap-ripple {
-  from {
-    opacity: 0.5;
-    transform: scale(0.72);
-  }
-
-  to {
-    opacity: 0;
-    transform: scale(1.35);
-  }
+.empty-state {
+  padding: 46rpx 24rpx;
+  color: var(--app-label-secondary);
+  font-size: 25rpx;
+  text-align: center;
 }
 
-@keyframes success-pop {
-  0% {
-    transform: translateY(10rpx) scale(0.96);
-  }
-
-  70% {
-    transform: translateY(-5rpx) scale(1.04);
-  }
-
-  100% {
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes goal-complete {
-  0% {
-    transform: scale(0.98);
-  }
-
-  70% {
-    transform: scale(1.025);
-  }
-
-  100% {
-    transform: scale(1);
-  }
-}
-
-@keyframes ring-spread {
-  from {
-    opacity: 0.8;
-    transform: scale(0.9);
-  }
-
-  to {
-    opacity: 0;
-    transform: scale(1.28);
-  }
-}
-
-@keyframes item-enter {
+@keyframes content-enter {
   from {
     opacity: 0;
     transform: translateY(16rpx);
@@ -905,17 +790,55 @@ function formatRecordDate(value: string) {
   }
 }
 
-@keyframes count-bump {
-  0% {
-    transform: scale(1);
+@keyframes item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
   }
 
-  60% {
-    transform: scale(1.08);
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes button-pop {
+  0% {
+    transform: translateY(5rpx) scale(0.98);
+  }
+
+  65% {
+    transform: translateY(-3rpx) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes success-pop {
+  0% {
+    transform: scale(0.985);
+  }
+
+  65% {
+    transform: scale(1.015);
   }
 
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes ring-spread {
+  from {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.14);
   }
 }
 </style>

@@ -27,12 +27,12 @@ function getImageByIndex(index: number, item: CustomTabBarItem) {
       <!-- <wd-icon :name="item.icon" size="20" /> -->
     </template>
     <template v-if="item.iconType === 'unocss' || item.iconType === 'iconfont'">
-      <view :class="[item.icon, isBulge ? 'text-80px' : 'text-20px']" />
+      <view :class="[item.icon, isBulge ? 'text-80px' : 'text-22px']" />
     </template>
     <template v-if="item.iconType === 'image'">
       <image :src="getImageByIndex(index, item)" mode="scaleToFill" :class="isBulge ? 'h-80px w-80px' : 'h-24px w-24px'" />
     </template>
-    <view v-if="!isBulge" class="mt-2px text-12px">
+    <view v-if="!isBulge" class="mt-2px text-11px">
       {{ item.text }}
     </view>
     <!-- 角标显示 -->
