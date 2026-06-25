@@ -21,6 +21,7 @@ definePage({
 })
 
 type TrendMetric = 'weight' | 'bmi'
+type MetricAccent = 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'red'
 
 const emptyStats: WeightStatsRes = {
   days: 30,
@@ -72,8 +73,75 @@ const targetWeight = computed(() => displayWeight(stats.value.targetWeightKg))
 const targetDistance = computed(() => displayWeight(stats.value.distanceToTargetKg))
 const canLoadMore = computed(() => records.value.length < total.value)
 const bmiReady = computed(() => Boolean(stats.value.heightCm))
+const hasTargetWeight = computed(() => {
+  return typeof stats.value.targetWeightKg === 'number' && Number.isFinite(stats.value.targetWeightKg) && stats.value.targetWeightKg > 0
+})
+const targetWeightValue = computed(() => hasTargetWeight.value ? targetWeight.value : '未设置')
+const targetDistanceValue = computed(() => stats.value.distanceToTargetKg === null || !hasTargetWeight.value ? '待计算' : targetDistance.value)
+const bmiValue = computed(() => stats.value.bmi ?? '待计算')
+const bmiAccent = computed<MetricAccent>(() => {
+  switch (stats.value.bmiCategory) {
+    case 'underweight':
+      return 'blue'
+    case 'normal':
+      return 'green'
+    case 'overweight':
+      return 'orange'
+    case 'obese':
+      return 'red'
+    default:
+      return 'orange'
+  }
+})
+const bmiAccentColor = computed(() => {
+  switch (bmiAccent.value) {
+    case 'blue':
+      return 'var(--app-blue)'
+    case 'green':
+      return 'var(--app-green)'
+    case 'red':
+      return 'var(--app-red)'
+    default:
+      return 'var(--app-orange)'
+  }
+})
+const targetGuidance = computed(() => {
+  if (stats.value.currentWeightKg === null) {
+    return '记录体重后，可查看目标进度'
+  }
+  if (!hasTargetWeight.value) {
+    return '设置目标体重后，可查看进度'
+  }
+  return `距离目标还差 ${targetDistance.value} ${unitLabel.value}`
+})
+const changeGuidance = computed(() => {
+  if (stats.value.changeKg === null) {
+    return records.value.length > 0 ? '再记录 1 次后显示变化' : '记录后显示变化'
+  }
+  return `较上次 ${formatChange()} ${unitLabel.value}`
+})
+const bmiGuidance = computed(() => {
+  if (!bmiReady.value) {
+    return '设置身高后计算 BMI'
+  }
+  if (stats.value.bmi === null) {
+    return '记录体重后生成 BMI'
+  }
+  return `${stats.value.bmiLabel}，建议控制在 18.5 - 23.9`
+})
+const bmiPointerStyle = computed(() => {
+  const bmi = stats.value.bmi ?? 18.5
+  const min = 16
+  const max = 32
+  const percent = Math.max(0, Math.min(100, ((bmi - min) / (max - min)) * 100))
+  return { left: `${percent}%`, background: bmiAccentColor.value }
+})
+const trendEmptyText = computed(() => {
+  const remaining = Math.max(0, 3 - stats.value.trend.length)
+  return `再记录 ${remaining} 次体重后，即可生成趋势图`
+})
 const weightProgress = computed(() => {
-  if (stats.value.currentWeightKg === null || stats.value.targetWeightKg === null || stats.value.previousWeightKg === null) {
+  if (stats.value.currentWeightKg === null || !hasTargetWeight.value || stats.value.previousWeightKg === null) {
     return 0
   }
   const startDistance = Math.abs(stats.value.previousWeightKg - stats.value.targetWeightKg)
@@ -407,10 +475,15 @@ function getChinaDateTimeParts(date: Date) {
                 <text class="weight-number numeric">{{ currentWeight }}</text>
                 <text class="weight-unit">{{ unitLabel }}</text>
               </view>
-              <text class="hero-change">较上次 {{ formatChange() }} {{ unitLabel }}</text>
+              <text class="hero-change">{{ changeGuidance }}</text>
+              <text class="hero-target">{{ targetGuidance }}</text>
             </view>
-            <view class="hero-ring">
+            <view v-if="hasTargetWeight && stats.currentWeightKg !== null" class="hero-ring">
               <progress-ring :percent="weightProgress" label="目标" accent="blue" />
+            </view>
+            <view v-else class="target-status" @click="openSettings">
+              <text class="target-status-main">{{ hasTargetWeight ? '记录体重' : '未设目标' }}</text>
+              <text class="target-status-sub">{{ hasTargetWeight ? '查看进度' : '点击设置' }}</text>
             </view>
             <button class="settings-button" aria-label="体重设置" hover-class="control-pressed" @click="openSettings">
               <text class="i-carbon-settings" />
@@ -420,9 +493,46 @@ function getChinaDateTimeParts(date: Date) {
       </view>
 
       <view class="summary-grid">
-        <metric-card label="BMI" :value="stats.bmi ?? '--'" :note="bmiReady ? stats.bmiLabel : '设置身高后计算'" icon="target" accent="orange" />
-        <metric-card label="目标体重" :value="targetWeight" :note="stats.targetWeightKg === null ? '未设置' : unitLabel" icon="weight" accent="pink" />
-        <metric-card label="距离目标" :value="targetDistance" :note="stats.distanceToTargetKg === null ? '未计算' : unitLabel" icon="streak" accent="blue" />
+        <metric-card
+          class="bmi-metric"
+          label="BMI"
+          :value="bmiValue"
+          :note="bmiGuidance"
+          icon="target"
+          :accent="bmiAccent"
+          :muted-value="stats.bmi === null"
+          note-emphasis
+        >
+          <view v-if="stats.bmi !== null" class="bmi-scale">
+            <view class="bmi-track">
+              <view class="bmi-pointer" :style="bmiPointerStyle" />
+            </view>
+            <view class="bmi-labels">
+              <text>偏低</text>
+              <text>正常</text>
+              <text>超重</text>
+              <text>肥胖</text>
+            </view>
+          </view>
+        </metric-card>
+        <metric-card
+          label="目标体重"
+          :value="targetWeightValue"
+          :note="!hasTargetWeight ? '点击设置目标' : unitLabel"
+          icon="weight"
+          accent="pink"
+          :muted-value="!hasTargetWeight"
+          @click="!hasTargetWeight && openSettings()"
+        />
+        <metric-card
+          label="距离目标"
+          :value="targetDistanceValue"
+          :note="stats.distanceToTargetKg === null || !hasTargetWeight ? '设置目标后计算' : unitLabel"
+          icon="streak"
+          accent="blue"
+          :muted-value="stats.distanceToTargetKg === null || !hasTargetWeight"
+          @click="(stats.distanceToTargetKg === null || !hasTargetWeight) && openSettings()"
+        />
         <metric-card label="记录总数" :value="total" note="历史条目" icon="badge" accent="green" />
       </view>
 
@@ -446,8 +556,8 @@ function getChinaDateTimeParts(date: Date) {
             <view v-if="loading && stats.trend.length === 0" class="chart-loading">
               加载中
             </view>
-            <view v-else-if="stats.trend.length === 0" class="chart-empty">
-              暂无趋势数据
+            <view v-else-if="stats.trend.length < 3" class="chart-empty compact">
+              {{ trendEmptyText }}
             </view>
             <view v-else-if="!recordModalVisible && !settingsModalVisible" class="chart-box">
               <qiun-data-charts type="line" :opts="chartOpts" :chart-data="chartData" :canvas2d="true" />
@@ -461,7 +571,7 @@ function getChinaDateTimeParts(date: Date) {
 
       <text class="ios-section-title">历史记录</text>
       <view class="section-shell">
-        <app-card accent="green">
+        <app-card accent="green" :show-accent="false">
           <view class="history-section">
             <view class="section-head history-head">
               <text class="section-title">全部记录</text>
@@ -585,7 +695,7 @@ function getChinaDateTimeParts(date: Date) {
   align-items: center;
   gap: 24rpx;
   min-height: 246rpx;
-  padding: 32rpx;
+  padding: 34rpx 86rpx 34rpx 32rpx;
   box-sizing: border-box;
   animation: app-enter var(--app-motion-normal) var(--app-ease-out) both;
 }
@@ -600,7 +710,8 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .hero-label,
-.hero-change {
+.hero-change,
+.hero-target {
   display: block;
   color: var(--app-label-secondary);
 }
@@ -638,26 +749,61 @@ function getChinaDateTimeParts(date: Date) {
   font-size: 23rpx;
 }
 
+.hero-target {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+}
+
 .hero-ring {
   flex: 0 0 auto;
   transform: scale(0.82);
   transform-origin: center right;
 }
 
+.target-status {
+  display: flex;
+  flex: 0 0 150rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150rpx;
+  border: 1rpx solid var(--app-separator);
+  border-radius: 50%;
+  background: var(--app-blue-soft);
+  box-sizing: border-box;
+}
+
+.target-status-main,
+.target-status-sub {
+  display: block;
+}
+
+.target-status-main {
+  color: var(--app-blue);
+  font-size: 25rpx;
+  font-weight: 780;
+}
+
+.target-status-sub {
+  margin-top: 4rpx;
+  color: var(--app-label-secondary);
+  font-size: 20rpx;
+}
+
 .settings-button {
   position: absolute;
-  top: 24rpx;
-  right: 24rpx;
+  top: 20rpx;
+  right: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 68rpx;
-  height: 68rpx;
+  width: 58rpx;
+  height: 58rpx;
   padding: 0;
   border-radius: 50%;
   color: var(--app-blue);
   background: var(--app-blue-soft);
-  font-size: 30rpx;
+  font-size: 27rpx;
   transition:
     transform var(--app-motion-fast) var(--app-ease-out),
     opacity var(--app-motion-fast) ease-out;
@@ -678,6 +824,47 @@ function getChinaDateTimeParts(date: Date) {
 
 .summary-grid :deep(.metric-card) {
   min-height: 160rpx;
+}
+
+.summary-grid :deep(.metric-note) {
+  line-height: 1.35;
+}
+
+.bmi-scale {
+  width: 100%;
+  margin-top: 14rpx;
+}
+
+.bmi-track {
+  position: relative;
+  height: 10rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(
+    90deg,
+    var(--app-blue) 0 25%,
+    var(--app-green) 25% 50%,
+    var(--app-orange) 50% 75%,
+    var(--app-red) 75% 100%
+  );
+}
+
+.bmi-pointer {
+  position: absolute;
+  top: -6rpx;
+  width: 6rpx;
+  height: 22rpx;
+  border-radius: 999rpx;
+  transform: translateX(-50%);
+}
+
+.bmi-labels {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8rpx;
+  margin-top: 8rpx;
+  color: var(--app-label-tertiary);
+  font-size: 19rpx;
+  text-align: center;
 }
 
 .record-button-shell {
@@ -745,6 +932,10 @@ function getChinaDateTimeParts(date: Date) {
 .chart-empty,
 .empty-list {
   min-height: 260rpx;
+}
+
+.chart-empty.compact {
+  min-height: 180rpx;
 }
 
 .empty-list,

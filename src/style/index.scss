@@ -1,8 +1,8 @@
 :root,
 page {
   --app-bg: #eef7f2;
-  --app-bg-2: #f7fbff;
-  --app-surface: rgba(255, 255, 255, 0.92);
+  --app-bg-2: #f7fbf8;
+  --app-surface: rgba(255, 255, 255, 0.94);
   --app-surface-solid: #ffffff;
   --app-surface-secondary: rgba(238, 247, 242, 0.86);
   --app-surface-tertiary: #e3efe9;
@@ -14,27 +14,27 @@ page {
   --app-fill: rgba(31, 178, 104, 0.09);
   --app-fill-strong: rgba(31, 178, 104, 0.16);
   --app-mask: rgba(6, 20, 15, 0.5);
-  --app-green: #20c46b;
-  --app-green-deep: #12894b;
-  --app-green-soft: rgba(32, 196, 107, 0.15);
-  --app-blue: #1688ff;
-  --app-blue-deep: #0f63c9;
-  --app-blue-soft: rgba(22, 136, 255, 0.13);
-  --app-orange: #ff9f1c;
-  --app-orange-soft: rgba(255, 159, 28, 0.16);
+  --app-green: #22c76f;
+  --app-green-deep: #109950;
+  --app-green-soft: rgba(34, 199, 111, 0.14);
+  --app-blue: #2f8fff;
+  --app-blue-deep: #176fd6;
+  --app-blue-soft: rgba(47, 143, 255, 0.12);
+  --app-orange: #ff9f1a;
+  --app-orange-soft: rgba(255, 159, 26, 0.14);
   --app-pink: #ff4d86;
   --app-pink-soft: rgba(255, 77, 134, 0.14);
   --app-gold: #d9a520;
   --app-gold-soft: rgba(217, 165, 32, 0.18);
-  --app-red: #ff4d4f;
+  --app-red: #ff5a6e;
   --app-purple: #8b5cf6;
   --app-purple-soft: rgba(139, 92, 246, 0.15);
   --app-card-radius: 28rpx;
   --app-control-radius: 22rpx;
   --app-pill-radius: 999rpx;
   --app-gutter: 32rpx;
-  --app-shadow: 0 2rpx 0 rgba(255, 255, 255, 0.78), 0 18rpx 48rpx rgba(31, 88, 58, 0.12);
-  --app-shadow-strong: 0 18rpx 56rpx rgba(20, 97, 63, 0.18);
+  --app-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.62), 0 8rpx 24rpx rgba(31, 88, 58, 0.055);
+  --app-shadow-strong: 0 12rpx 34rpx rgba(20, 97, 63, 0.085);
   --app-motion-fast: 160ms;
   --app-motion-normal: 260ms;
   --app-motion-slow: 420ms;
@@ -74,8 +74,8 @@ page {
   --app-red: #ff6b6b;
   --app-purple: #a78bfa;
   --app-purple-soft: rgba(167, 139, 250, 0.2);
-  --app-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.04), 0 20rpx 52rpx rgba(0, 0, 0, 0.34);
-  --app-shadow-strong: 0 24rpx 64rpx rgba(0, 0, 0, 0.42);
+  --app-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.035), 0 14rpx 38rpx rgba(0, 0, 0, 0.28);
+  --app-shadow-strong: 0 18rpx 48rpx rgba(0, 0, 0, 0.34);
 }
 
 button,
@@ -88,10 +88,7 @@ button::after {
 }
 
 .app-shell {
-  background:
-    radial-gradient(circle at 12% 4%, rgba(32, 196, 107, 0.2), transparent 34%),
-    radial-gradient(circle at 92% 12%, rgba(22, 136, 255, 0.16), transparent 30%),
-    linear-gradient(180deg, var(--app-bg-2), var(--app-bg));
+  background: linear-gradient(180deg, var(--app-bg-2), var(--app-bg));
 }
 
 .app-page {
@@ -167,6 +164,11 @@ button::after {
 .accent-gold {
   --accent: var(--app-gold);
   --accent-soft: var(--app-gold-soft);
+}
+
+.accent-red {
+  --accent: var(--app-red);
+  --accent-soft: rgba(255, 90, 110, 0.12);
 }
 
 @keyframes app-enter {

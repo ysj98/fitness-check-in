@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { Achievement } from '@/api/achievements'
+import type { Achievement, AchievementCategory } from '@/api/achievements'
 import type { ThemeMode } from '@/store'
 import { getAchievements } from '@/api/achievements'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
@@ -21,6 +21,7 @@ const profileReady = ref(false)
 const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
 const achievements = ref<Achievement[]>([])
+const selectedAchievementCategory = ref<AchievementCategory>('checkin')
 const genderOptions = [
   { label: '未设置', value: '' },
   { label: '男', value: 'male' },
@@ -56,6 +57,21 @@ const completionPercent = computed(() => {
   return Math.round((unlockedAchievementCount.value / achievements.value.length) * 100)
 })
 const profileAccent = computed(() => form.gender === 'male' ? 'blue' : 'pink')
+const achievementCategories: { label: string, value: AchievementCategory }[] = [
+  { label: '打卡', value: 'checkin' },
+  { label: '连续', value: 'streak' },
+  { label: '体重', value: 'weight' },
+  { label: '资料', value: 'profile' },
+]
+const achievementCategoryOptions = computed(() => achievementCategories.map((category) => {
+  const total = achievements.value.filter(item => item.category === category.value).length
+  const unlocked = achievements.value.filter(item => item.category === category.value && item.unlocked).length
+  return {
+    label: `${category.label} ${unlocked}/${total}`,
+    value: category.value,
+  }
+}))
+const filteredAchievements = computed(() => achievements.value.filter(item => item.category === selectedAchievementCategory.value))
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 onShow(() => {
@@ -102,6 +118,10 @@ function selectTheme(mode: ThemeMode) {
   }
   themeStore.setMode(mode)
   triggerSuccessHaptic()
+}
+
+function selectAchievementCategory(category: AchievementCategory) {
+  selectedAchievementCategory.value = category
 }
 
 async function refreshAchievements() {
@@ -208,12 +228,12 @@ async function saveProfile() {
             <text class="profile-subtitle">{{ unlockedAchievementCount }} 项成就已解锁</text>
             <view class="profile-stats">
               <view class="profile-stat">
-                <text class="stat-value numeric">{{ completionPercent }}%</text>
-                <text class="stat-label">成就</text>
+                <text class="stat-label">已解锁</text>
+                <text class="stat-value numeric">{{ unlockedAchievementCount }} 项</text>
               </view>
               <view class="profile-stat">
-                <text class="stat-value numeric">{{ form.dailyGoal }}</text>
                 <text class="stat-label">每日目标</text>
+                <text class="stat-value numeric">{{ form.dailyGoal }} 次</text>
               </view>
             </view>
           </view>
@@ -317,11 +337,19 @@ async function saveProfile() {
       <text class="ios-section-title achievement-section-title">我的成就</text>
       <text class="achievement-count numeric">{{ unlockedAchievementCount }}/{{ achievements.length }}</text>
     </view>
+    <view class="achievement-filter-shell">
+      <app-segmented-control
+        :model-value="selectedAchievementCategory"
+        :options="achievementCategoryOptions"
+        @change="selectAchievementCategory"
+      />
+    </view>
     <view class="badge-grid">
       <achievement-badge
-        v-for="(achievement, index) in achievements"
+        v-for="(achievement, index) in filteredAchievements"
         :key="achievement.key"
         :achievement="achievement"
+        variant="tile"
         :style="{ animationDelay: `${Math.min(index, 10) * 35}ms` }"
       />
     </view>
@@ -337,6 +365,7 @@ async function saveProfile() {
 .profile-summary-shell,
 .form-section-shell,
 .appearance-card-shell,
+.achievement-filter-shell,
 .badge-grid {
   margin-right: var(--app-gutter);
   margin-left: var(--app-gutter);
@@ -345,13 +374,13 @@ async function saveProfile() {
 .profile-summary-shell {
   --profile-accent: var(--app-pink);
   --profile-accent-soft: var(--app-pink-soft);
-  --profile-accent-shadow: rgba(255, 77, 134, 0.16);
+  --profile-accent-shadow: rgba(255, 77, 134, 0.1);
 }
 
 .profile-summary-shell.accent-blue {
   --profile-accent: var(--app-blue);
   --profile-accent-soft: var(--app-blue-soft);
-  --profile-accent-shadow: rgba(22, 136, 255, 0.18);
+  --profile-accent-shadow: rgba(22, 136, 255, 0.1);
 }
 
 .profile-summary-content {
@@ -433,8 +462,8 @@ async function saveProfile() {
 }
 
 .profile-stat {
-  min-width: 106rpx;
-  padding: 10rpx 14rpx;
+  min-width: 118rpx;
+  padding: 12rpx 14rpx;
   border-radius: 18rpx;
   background: var(--app-fill);
   box-sizing: border-box;
@@ -447,7 +476,7 @@ async function saveProfile() {
 
 .stat-value {
   color: var(--app-pink);
-  font-size: 25rpx;
+  font-size: 24rpx;
   font-weight: 820;
 }
 
@@ -456,9 +485,12 @@ async function saveProfile() {
 }
 
 .stat-label {
-  margin-top: 2rpx;
   color: var(--app-label-secondary);
   font-size: 18rpx;
+}
+
+.stat-value {
+  margin-top: 4rpx;
 }
 
 .profile-progress {
@@ -572,10 +604,33 @@ async function saveProfile() {
   font-size: 23rpx;
 }
 
+.achievement-filter-shell {
+  margin-bottom: 18rpx;
+}
+
+.achievement-filter-shell :deep(.segmented-control) {
+  padding: 4rpx;
+  border-color: transparent;
+  background: var(--app-green-soft);
+}
+
+.achievement-filter-shell :deep(.segment-button) {
+  height: 52rpx;
+  padding: 0 6rpx;
+  color: var(--app-label-secondary);
+  font-size: 19rpx;
+  line-height: 52rpx;
+}
+
+.achievement-filter-shell :deep(.segment-button.active) {
+  color: var(--app-label-primary);
+  box-shadow: 0 5rpx 14rpx rgba(31, 88, 58, 0.075);
+}
+
 .badge-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 16rpx;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .badge-grid :deep(.achievement-badge) {
@@ -590,6 +645,10 @@ async function saveProfile() {
 
   .profile-progress {
     display: none;
+  }
+
+  .badge-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

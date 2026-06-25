@@ -80,7 +80,7 @@ const iconClass = computed(() => props.name.startsWith('i-') ? props.name : `i-f
 .active {
   color: #fff;
   background: var(--accent);
-  box-shadow: 0 12rpx 28rpx var(--accent-shadow, rgba(32, 196, 107, 0.22));
+  box-shadow: 0 6rpx 16rpx var(--accent-shadow, rgba(32, 196, 107, 0.12));
 }
 
 .muted {
@@ -91,31 +91,31 @@ const iconClass = computed(() => props.name.startsWith('i-') ? props.name : `i-f
 .accent-green {
   --accent: var(--app-green);
   --accent-soft: var(--app-green-soft);
-  --accent-shadow: rgba(32, 196, 107, 0.22);
+  --accent-shadow: rgba(32, 196, 107, 0.12);
 }
 
 .accent-blue {
   --accent: var(--app-blue);
   --accent-soft: var(--app-blue-soft);
-  --accent-shadow: rgba(22, 136, 255, 0.22);
+  --accent-shadow: rgba(22, 136, 255, 0.12);
 }
 
 .accent-orange {
   --accent: var(--app-orange);
   --accent-soft: var(--app-orange-soft);
-  --accent-shadow: rgba(255, 159, 28, 0.22);
+  --accent-shadow: rgba(255, 159, 28, 0.12);
 }
 
 .accent-pink {
   --accent: var(--app-pink);
   --accent-soft: var(--app-pink-soft);
-  --accent-shadow: rgba(255, 77, 134, 0.2);
+  --accent-shadow: rgba(255, 77, 134, 0.11);
 }
 
 .accent-gold {
   --accent: var(--app-gold);
   --accent-soft: var(--app-gold-soft);
-  --accent-shadow: rgba(217, 165, 32, 0.24);
+  --accent-shadow: rgba(217, 165, 32, 0.12);
 }
 
 .accent-purple {

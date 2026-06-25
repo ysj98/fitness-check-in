@@ -3,12 +3,13 @@ import type { Achievement } from '@/api/achievements'
 
 defineProps<{
   achievement: Achievement
+  variant?: 'list' | 'tile'
 }>()
 </script>
 
 <template>
-  <view class="achievement-badge" :class="[`accent-${achievement.accent}`, `tier-${achievement.tier}`, { unlocked: achievement.unlocked }]">
-    <app-icon :name="achievement.icon" :accent="achievement.accent" :active="achievement.unlocked" size="md" />
+  <view class="achievement-badge" :class="[`accent-${achievement.accent}`, `tier-${achievement.tier}`, variant || 'list', { unlocked: achievement.unlocked }]">
+    <app-icon :name="achievement.icon" :accent="achievement.accent" :active="achievement.unlocked" :size="variant === 'tile' ? 'sm' : 'md'" />
     <view class="badge-copy">
       <view class="badge-head">
         <text class="badge-name">{{ achievement.name }}</text>
@@ -45,6 +46,13 @@ defineProps<{
   opacity: 0.72;
 }
 
+.achievement-badge.tile {
+  display: block;
+  min-height: 198rpx;
+  padding: 20rpx;
+  box-shadow: 0 6rpx 18rpx rgba(31, 88, 58, 0.045);
+}
+
 .achievement-badge.unlocked {
   opacity: 1;
 }
@@ -54,7 +62,7 @@ defineProps<{
   top: -40rpx;
   bottom: -40rpx;
   width: 56rpx;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.52), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
   content: '';
   animation: shimmer 2.4s ease-in-out infinite;
 }
@@ -64,6 +72,10 @@ defineProps<{
   min-width: 0;
 }
 
+.tile .badge-copy {
+  margin-top: 14rpx;
+}
+
 .badge-head {
   display: flex;
   align-items: center;
@@ -71,11 +83,21 @@ defineProps<{
   gap: 12rpx;
 }
 
+.tile .badge-head {
+  display: block;
+}
+
 .badge-name {
   min-width: 0;
   color: var(--app-label-primary);
   font-size: 27rpx;
   font-weight: 760;
+}
+
+.tile .badge-name {
+  display: block;
+  min-height: 34rpx;
+  font-size: 25rpx;
 }
 
 .badge-tier {
@@ -87,6 +109,12 @@ defineProps<{
   font-size: 18rpx;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.tile .badge-tier {
+  display: inline-block;
+  margin-top: 6rpx;
+  opacity: 0.74;
 }
 
 .badge-desc,
@@ -101,9 +129,14 @@ defineProps<{
   line-height: 1.35;
 }
 
+.tile .badge-desc {
+  margin-top: 5rpx;
+  font-size: 19rpx;
+}
+
 .progress-track {
   height: 9rpx;
-  margin-top: 14rpx;
+  margin-top: 12rpx;
   border-radius: 999rpx;
   background: var(--app-fill);
   overflow: hidden;
@@ -118,7 +151,7 @@ defineProps<{
 
 .badge-progress {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   font-size: 19rpx;
   text-align: right;
 }
@@ -129,5 +162,11 @@ defineProps<{
   bottom: 18rpx;
   color: var(--accent);
   font-size: 28rpx;
+}
+
+.tile .badge-state {
+  top: 24rpx;
+  right: 24rpx;
+  bottom: auto;
 }
 </style>

@@ -38,6 +38,26 @@ const ringStyle = computed(() => ({
   animation: ring-enter var(--app-motion-slow) var(--app-ease-out) both;
 }
 
+.accent-green {
+  --accent: var(--app-green);
+}
+
+.accent-blue {
+  --accent: var(--app-blue);
+}
+
+.accent-orange {
+  --accent: var(--app-orange);
+}
+
+.accent-pink {
+  --accent: var(--app-pink);
+}
+
+.accent-gold {
+  --accent: var(--app-gold);
+}
+
 .size-md {
   width: 174rpx;
   height: 174rpx;

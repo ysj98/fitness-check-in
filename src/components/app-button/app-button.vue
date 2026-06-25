@@ -60,8 +60,8 @@ defineEmits<{
   color: #fff;
   background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   box-shadow:
-    0 10rpx 0 var(--accent-deep),
-    0 18rpx 34rpx var(--accent-shadow);
+    0 7rpx 0 var(--accent-deep),
+    0 12rpx 24rpx var(--accent-shadow);
 }
 
 .variant-soft {
@@ -93,41 +93,41 @@ defineEmits<{
   --accent: var(--app-green);
   --accent-soft: var(--app-green-soft);
   --accent-deep: var(--app-green-deep);
-  --accent-shadow: rgba(32, 196, 107, 0.22);
+  --accent-shadow: rgba(32, 196, 107, 0.14);
 }
 
 .accent-blue {
   --accent: var(--app-blue);
   --accent-soft: var(--app-blue-soft);
   --accent-deep: var(--app-blue-deep);
-  --accent-shadow: rgba(22, 136, 255, 0.22);
+  --accent-shadow: rgba(22, 136, 255, 0.14);
 }
 
 .accent-orange {
   --accent: var(--app-orange);
   --accent-soft: var(--app-orange-soft);
   --accent-deep: #c66d00;
-  --accent-shadow: rgba(255, 159, 28, 0.24);
+  --accent-shadow: rgba(255, 159, 28, 0.15);
 }
 
 .accent-pink {
   --accent: var(--app-pink);
   --accent-soft: var(--app-pink-soft);
   --accent-deep: #cb2d61;
-  --accent-shadow: rgba(255, 77, 134, 0.22);
+  --accent-shadow: rgba(255, 77, 134, 0.14);
 }
 
 .accent-gold {
   --accent: var(--app-gold);
   --accent-soft: var(--app-gold-soft);
   --accent-deep: #a97800;
-  --accent-shadow: rgba(217, 165, 32, 0.25);
+  --accent-shadow: rgba(217, 165, 32, 0.14);
 }
 
 .accent-red {
   --accent: var(--app-red);
   --accent-soft: rgba(255, 77, 79, 0.14);
   --accent-deep: #c93a3c;
-  --accent-shadow: rgba(255, 77, 79, 0.22);
+  --accent-shadow: rgba(255, 77, 79, 0.14);
 }
 </style>

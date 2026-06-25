@@ -3,15 +3,17 @@ withDefaults(defineProps<{
   accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
   elevated?: boolean
   interactive?: boolean
+  showAccent?: boolean
 }>(), {
   accent: 'green',
   elevated: false,
   interactive: false,
+  showAccent: true,
 })
 </script>
 
 <template>
-  <view class="app-card" :class="[`accent-${accent}`, { elevated, interactive }]">
+  <view class="app-card" :class="[`accent-${accent}`, { elevated, interactive, 'no-accent': !showAccent }]">
     <slot />
   </view>
 </template>
@@ -29,10 +31,15 @@ withDefaults(defineProps<{
   top: 0;
   right: 30rpx;
   left: 30rpx;
-  height: 5rpx;
+  height: 4rpx;
   border-radius: 0 0 999rpx 999rpx;
   background: var(--accent, var(--app-green));
+  opacity: 0.72;
   content: '';
+}
+
+.app-card.no-accent::before {
+  display: none;
 }
 
 .elevated {

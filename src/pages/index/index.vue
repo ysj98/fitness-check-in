@@ -1,26 +1,44 @@
 <script lang="ts" setup>
-import type { CheckInRecord, CheckInStatsRes, MonthCheckInRes } from '@/api/checkins'
-import { createCheckIn, deleteCheckIn, getCheckInStats, getMonthCheckIns, getRecentCheckIns, getTodayCheckIns } from '@/api/checkins'
-import { useTokenStore } from '@/store'
-import { triggerSuccessHaptic } from '@/utils/haptics'
+import type {
+  CheckInRecord,
+  CheckInStatsRes,
+  MonthCheckInRes,
+} from "@/api/checkins";
+import {
+  createCheckIn,
+  deleteCheckIn,
+  getCheckInStats,
+  getMonthCheckIns,
+  getRecentCheckIns,
+  getTodayCheckIns,
+} from "@/api/checkins";
+import { useTokenStore } from "@/store";
+import { triggerSuccessHaptic } from "@/utils/haptics";
 
 defineOptions({
-  name: 'Home',
-})
+  name: "Home",
+});
 
 definePage({
-  type: 'home',
+  type: "home",
   style: {
-    navigationStyle: 'custom',
-    navigationBarTitleText: '运动打卡',
+    navigationStyle: "custom",
+    navigationBarTitleText: "运动打卡",
   },
-})
+});
 
 interface CalendarDay {
-  key: string
-  day: number
-  count: number
-  isToday: boolean
+  key: string;
+  day: number;
+  count: number;
+  isToday: boolean;
+}
+
+interface RecentDaySummary {
+  key: string;
+  label: string;
+  count: number;
+  isToday: boolean;
 }
 
 const emptyStats: CheckInStatsRes = {
@@ -29,209 +47,275 @@ const emptyStats: CheckInStatsRes = {
   todayGoal: 1,
   todayCompleted: false,
   badges: [],
-}
+};
 
-const tokenStore = useTokenStore()
-const loading = ref(false)
-const checking = ref(false)
-const loginReady = ref(false)
-const successPulse = ref(false)
-const pageReady = ref(false)
-const selectedMonth = ref(new Date())
-const todayCount = ref(0)
-const todayRecords = ref<CheckInRecord[]>([])
-const recentRecords = ref<CheckInRecord[]>([])
-const monthStats = ref<MonthCheckInRes>({ month: getMonthKey(), days: {} })
-const checkInStats = ref<CheckInStatsRes>({ ...emptyStats })
-const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+const tokenStore = useTokenStore();
+const loading = ref(false);
+const checking = ref(false);
+const loginReady = ref(false);
+const successPulse = ref(false);
+const pageReady = ref(false);
+const selectedMonth = ref(new Date());
+const selectedDateKey = ref(formatDateKey(new Date()));
+const recentExpanded = ref(false);
+const activeRecordActionId = ref<number | null>(null);
+const todayCount = ref(0);
+const todayRecords = ref<CheckInRecord[]>([]);
+const recentRecords = ref<CheckInRecord[]>([]);
+const monthStats = ref<MonthCheckInRes>({ month: getMonthKey(), days: {} });
+const checkInStats = ref<CheckInStatsRes>({ ...emptyStats });
+const weekLabels = ["一", "二", "三", "四", "五", "六", "日"];
 
 const todayLabel = computed(() => {
-  const date = new Date()
-  const weekMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekMap[date.getDay()]}`
-})
+  const date = new Date();
+  const weekMap = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekMap[date.getDay()]}`;
+});
 
-const monthKey = computed(() => getMonthKey(selectedMonth.value))
+const monthKey = computed(() => getMonthKey(selectedMonth.value));
 const monthTitle = computed(() => {
-  const [year, month] = monthStats.value.month.split('-')
-  return `${year}年${Number(month)}月`
-})
+  const [year, month] = monthStats.value.month.split("-");
+  return `${year}年${Number(month)}月`;
+});
 
 const calendarDays = computed<CalendarDay[]>(() => {
-  const [year, month] = monthStats.value.month.split('-').map(Number)
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const todayKey = formatDateKey(new Date())
+  const [year, month] = monthStats.value.month.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const todayKey = formatDateKey(new Date());
 
   return Array.from({ length: daysInMonth }, (_, index) => {
-    const day = index + 1
-    const key = `${year}-${pad(month)}-${pad(day)}`
+    const day = index + 1;
+    const key = `${year}-${pad(month)}-${pad(day)}`;
     return {
       key,
       day,
       count: monthStats.value.days[key] || 0,
       isToday: key === todayKey,
-    }
-  })
-})
+    };
+  });
+});
 
 const calendarStartOffset = computed(() => {
-  const [year, month] = monthStats.value.month.split('-').map(Number)
-  const day = new Date(year, month - 1, 1).getDay()
-  return day === 0 ? 6 : day - 1
-})
-
-const goalPercent = computed(() => {
-  const goal = Math.max(checkInStats.value.todayGoal || 1, 1)
-  return Math.min(100, Math.round((todayCount.value / goal) * 100))
-})
+  const [year, month] = monthStats.value.month.split("-").map(Number);
+  const day = new Date(year, month - 1, 1).getDay();
+  return day === 0 ? 6 : day - 1;
+});
 
 const goalText = computed(() => {
-  if (checkInStats.value.todayCompleted) {
-    return '今日目标已达成'
+  const goal = checkInStats.value.todayGoal || 1;
+  return `已完成 ${Math.min(todayCount.value, goal)}/${goal}`;
+});
+
+const checkInButtonText = computed(() => {
+  if (checking.value) {
+    return "打卡中...";
   }
-  return `还差 ${Math.max((checkInStats.value.todayGoal || 1) - todayCount.value, 0)} 次达标`
-})
+  if (successPulse.value) {
+    return "打卡成功";
+  }
+  return checkInStats.value.todayCompleted ? "继续打卡" : "立即打卡";
+});
+
+const checkInSummaryText = computed(() => {
+  return `今天已打卡 ${todayCount.value} 次，连续坚持 ${checkInStats.value.currentStreak} 天`;
+});
+
+const recentDaySummaries = computed<RecentDaySummary[]>(() => {
+  const countMap = recentRecords.value.reduce<Record<string, number>>(
+    (result, record) => {
+      const key = formatDateKey(new Date(record.checkedAt));
+      result[key] = (result[key] || 0) + 1;
+      return result;
+    },
+    {},
+  );
+  const today = new Date();
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - index);
+    const key = formatDateKey(date);
+    return {
+      key,
+      label:
+        index === 0
+          ? "今天"
+          : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
+      count: countMap[key] || 0,
+      isToday: index === 0,
+    };
+  });
+});
+
+const visibleRecentDaySummaries = computed(() => {
+  return recentExpanded.value
+    ? recentDaySummaries.value
+    : recentDaySummaries.value.slice(0, 3);
+});
 
 onLoad(() => {
-  initPage()
+  initPage();
   setTimeout(() => {
-    pageReady.value = true
-  }, 40)
-})
+    pageReady.value = true;
+  }, 40);
+});
 
 onShow(() => {
   if (loginReady.value) {
-    loadDashboard()
+    loadDashboard();
   }
-})
+});
 
 async function initPage() {
-  loading.value = true
+  loading.value = true;
   try {
-    await ensureLogin()
-    await loadDashboard()
-  }
-  catch {
-    uni.showToast({ title: '数据加载失败，请重试', icon: 'none' })
-  }
-  finally {
-    loading.value = false
+    await ensureLogin();
+    await loadDashboard();
+  } catch {
+    uni.showToast({ title: "数据加载失败，请重试", icon: "none" });
+  } finally {
+    loading.value = false;
   }
 }
 
 async function ensureLogin() {
   if (tokenStore.hasLogin()) {
-    loginReady.value = true
-    return
+    loginReady.value = true;
+    return;
   }
 
-  await tokenStore.wxLogin()
-  loginReady.value = true
+  await tokenStore.wxLogin();
+  loginReady.value = true;
 }
 
 async function loadDashboard() {
   const [today, recent, month, stats] = await Promise.all([
     getTodayCheckIns(),
-    getRecentCheckIns(12),
+    getRecentCheckIns(100),
     getMonthCheckIns(monthKey.value),
     getCheckInStats(),
-  ])
+  ]);
 
-  todayCount.value = today.count
-  todayRecords.value = today.records
-  recentRecords.value = recent
-  monthStats.value = month
-  checkInStats.value = stats
+  todayCount.value = today.count;
+  todayRecords.value = today.records;
+  recentRecords.value = recent;
+  monthStats.value = month;
+  checkInStats.value = stats;
 }
 
 async function loadMonth() {
-  monthStats.value = await getMonthCheckIns(monthKey.value)
+  monthStats.value = await getMonthCheckIns(monthKey.value);
 }
 
 async function changeMonth(offset: number) {
-  const current = selectedMonth.value
-  selectedMonth.value = new Date(current.getFullYear(), current.getMonth() + offset, 1)
-  await loadMonth()
+  const current = selectedMonth.value;
+  selectedMonth.value = new Date(
+    current.getFullYear(),
+    current.getMonth() + offset,
+    1,
+  );
+  await loadMonth();
 }
 
 async function backToCurrentMonth() {
-  selectedMonth.value = new Date()
-  await loadMonth()
+  selectedMonth.value = new Date();
+  await loadMonth();
 }
 
 async function handleCheckIn() {
   if (checking.value) {
-    return
+    return;
   }
 
-  checking.value = true
+  checking.value = true;
   try {
-    await ensureLogin()
-    const record = await createCheckIn()
-    successPulse.value = false
-    await nextTick()
-    successPulse.value = true
-    todayCount.value += 1
-    todayRecords.value = [record, ...todayRecords.value]
-    recentRecords.value = [record, ...recentRecords.value].slice(0, 12)
+    await ensureLogin();
+    const record = await createCheckIn();
+    successPulse.value = false;
+    await nextTick();
+    successPulse.value = true;
+    todayCount.value += 1;
+    todayRecords.value = [record, ...todayRecords.value];
+    recentRecords.value = [record, ...recentRecords.value].slice(0, 100);
     const [month, stats] = await Promise.all([
       getMonthCheckIns(monthKey.value),
       getCheckInStats(),
-    ])
-    monthStats.value = month
-    checkInStats.value = stats
-    triggerSuccessHaptic()
+    ]);
+    monthStats.value = month;
+    checkInStats.value = stats;
+    triggerSuccessHaptic();
     uni.showToast({
-      title: stats.todayCompleted ? '今日目标达成' : '打卡成功',
-      icon: 'success',
-    })
-  }
-  finally {
-    checking.value = false
+      title: stats.todayCompleted ? "今日目标达成" : "打卡成功",
+      icon: "success",
+    });
+  } finally {
+    checking.value = false;
     setTimeout(() => {
-      successPulse.value = false
-    }, 420)
+      successPulse.value = false;
+    }, 420);
   }
 }
 
 async function handleDelete(record: CheckInRecord) {
-  await deleteCheckIn(record.id)
-  todayRecords.value = todayRecords.value.filter(item => item.id !== record.id)
-  recentRecords.value = recentRecords.value.filter(item => item.id !== record.id)
-  todayCount.value = Math.max(0, todayCount.value - 1)
+  const confirmed = await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: "确认删除这条打卡记录吗？",
+      content: "删除后无法恢复",
+      confirmText: "删除",
+      confirmColor: "#ff5a6e",
+      success: (result) => resolve(result.confirm),
+      fail: () => resolve(false),
+    });
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  await deleteCheckIn(record.id);
+  activeRecordActionId.value = null;
+  todayRecords.value = todayRecords.value.filter(
+    (item) => item.id !== record.id,
+  );
+  recentRecords.value = recentRecords.value.filter(
+    (item) => item.id !== record.id,
+  );
+  todayCount.value = Math.max(0, todayCount.value - 1);
   const [month, stats] = await Promise.all([
     getMonthCheckIns(monthKey.value),
     getCheckInStats(),
-  ])
-  monthStats.value = month
-  checkInStats.value = stats
+  ]);
+  monthStats.value = month;
+  checkInStats.value = stats;
   uni.showToast({
-    title: '已删除',
-    icon: 'none',
-  })
+    title: "已删除",
+    icon: "none",
+  });
+}
+
+function selectCalendarDay(day: CalendarDay) {
+  selectedDateKey.value = day.key;
+}
+
+function toggleRecordActions(recordId: number) {
+  activeRecordActionId.value =
+    activeRecordActionId.value === recordId ? null : recordId;
 }
 
 function getMonthKey(date = new Date()) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
 }
 
 function formatDateKey(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function pad(value: number) {
-  return value.toString().padStart(2, '0')
+  return value.toString().padStart(2, "0");
 }
 
 function formatTime(value: string) {
-  const date = new Date(value)
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
-
-function formatRecordDate(value: string) {
-  const date = new Date(value)
-  const key = formatDateKey(date)
-  return key === formatDateKey(new Date()) ? '今天' : `${date.getMonth() + 1}月${date.getDate()}日`
+  const date = new Date(value);
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 </script>
 
@@ -239,117 +323,188 @@ function formatRecordDate(value: string) {
   <view class="app-page checkin-page" :class="{ ready: pageReady }">
     <ios-page-header title="运动" :subtitle="todayLabel" accent="green" />
 
-    <app-card class="energy-card" accent="green" elevated :class="{ pulse: successPulse }">
-      <view class="hero-top">
-        <view>
-          <text class="eyebrow">今日能量</text>
-          <view class="streak-value numeric">
-            <text>{{ checkInStats.currentStreak }}</text>
-            <text class="streak-unit">天连续</text>
+    <view class="energy-card-shell">
+      <app-card accent="green" elevated>
+        <view class="energy-card-content" :class="{ pulse: successPulse }">
+          <view class="goal-panel">
+            <view>
+              <text class="goal-caption">今日目标</text>
+              <text class="goal-status">{{ goalText }}</text>
+            </view>
+            <text class="goal-fraction numeric">
+              {{ todayCount }}/{{ checkInStats.todayGoal || 1 }}
+            </text>
           </view>
-        </view>
-        <progress-ring :percent="goalPercent" label="目标" accent="green" />
-      </view>
 
-      <view class="goal-panel">
-        <view>
-          <text class="goal-caption">今日目标</text>
-          <text class="goal-status">{{ goalText }}</text>
-        </view>
-        <text class="goal-fraction numeric">{{ todayCount }}/{{ checkInStats.todayGoal || 1 }}</text>
-      </view>
-
-      <view class="checkin-action">
-        <button
-          class="checkin-button"
-          :class="{ checking, success: successPulse }"
-          :disabled="checking || loading"
-          hover-class="checkin-button-pressed"
-          @click="handleCheckIn"
-        >
-          <view class="button-copy">
-            <text class="button-main">{{ checking ? '记录中' : '立即打卡' }}</text>
-            <text class="button-sub">今日第 {{ todayCount + 1 }} 次</text>
+          <view class="checkin-action">
+            <button
+              class="checkin-button"
+              :class="{ checking, success: successPulse }"
+              :disabled="checking || loading"
+              hover-class="checkin-button-pressed"
+              @click="handleCheckIn"
+            >
+              <view class="button-copy">
+                <text class="button-main">{{ checkInButtonText }}</text>
+                <text class="button-sub">今日第 {{ todayCount + 1 }} 次</text>
+              </view>
+            </button>
+            <view v-if="successPulse" class="success-ring" />
           </view>
-        </button>
-        <view v-if="successPulse" class="success-ring" />
-      </view>
-    </app-card>
+
+          <text class="checkin-summary">{{ checkInSummaryText }}</text>
+        </view>
+      </app-card>
+    </view>
 
     <text class="ios-section-title">月度热力</text>
-    <app-card class="calendar-card" accent="blue">
-      <view class="calendar-head">
-        <button class="icon-button" aria-label="上个月" hover-class="icon-button-pressed" @click="changeMonth(-1)">
-          <text class="i-carbon-chevron-left" />
-        </button>
-        <view class="month-title-wrap" @click="backToCurrentMonth">
-          <text class="month-title">{{ monthTitle }}</text>
-          <text class="month-subtitle">点按回到本月</text>
+    <view class="calendar-card-shell">
+      <app-card accent="blue">
+        <view class="calendar-card-content">
+          <view class="calendar-head">
+            <button
+              class="icon-button"
+              aria-label="上个月"
+              hover-class="icon-button-pressed"
+              @click="changeMonth(-1)"
+            >
+              <text class="i-carbon-chevron-left" />
+            </button>
+            <view class="month-title-wrap" @click="backToCurrentMonth">
+              <text class="month-title">{{ monthTitle }}</text>
+              <text class="month-subtitle">点按回到本月</text>
+            </view>
+            <button
+              class="icon-button"
+              aria-label="下个月"
+              hover-class="icon-button-pressed"
+              @click="changeMonth(1)"
+            >
+              <text class="i-carbon-chevron-right" />
+            </button>
+          </view>
+          <view class="calendar-grid week-row">
+            <text v-for="label in weekLabels" :key="label" class="week-label">
+              {{ label }}
+            </text>
+          </view>
+          <view class="calendar-grid days-grid">
+            <view
+              v-for="index in calendarStartOffset"
+              :key="`blank-${index}`"
+              class="calendar-day placeholder"
+            />
+            <view
+              v-for="day in calendarDays"
+              :key="day.key"
+              class="calendar-day"
+              :class="{
+                'level-1': day.count === 1,
+                'level-2': day.count === 2,
+                'level-3': day.count >= 3,
+                today: day.isToday,
+                selected: day.key === selectedDateKey,
+              }"
+              @click="selectCalendarDay(day)"
+            >
+              <text>{{ day.day }}</text>
+              <view v-if="day.count > 0" class="day-count numeric">
+                {{ day.count }}
+              </view>
+            </view>
+          </view>
+          <view class="heat-legend">
+            <text>少</text>
+            <view class="legend-dot level-1" />
+            <view class="legend-dot level-2" />
+            <view class="legend-dot level-3" />
+            <text>多</text>
+          </view>
         </view>
-        <button class="icon-button" aria-label="下个月" hover-class="icon-button-pressed" @click="changeMonth(1)">
-          <text class="i-carbon-chevron-right" />
-        </button>
-      </view>
-      <view class="calendar-grid week-row">
-        <text v-for="label in weekLabels" :key="label" class="week-label">{{ label }}</text>
-      </view>
-      <view class="calendar-grid days-grid">
-        <view v-for="index in calendarStartOffset" :key="`blank-${index}`" class="calendar-day placeholder" />
+      </app-card>
+    </view>
+
+    <text class="ios-section-title">今日记录</text>
+    <view class="record-card-shell">
+      <view class="record-card" accent="green" :show-accent="false">
+        <view v-if="todayRecords.length === 0" class="empty-state">
+          <app-icon name="target" accent="green" size="md" />
+          <text>还没有记录，点亮今天的第一格。</text>
+        </view>
         <view
-          v-for="day in calendarDays"
-          :key="day.key"
-          class="calendar-day"
-          :class="{ active: day.count > 0, today: day.isToday, hot: day.count >= 2 }"
+          v-for="(record, index) in todayRecords"
+          v-else
+          :key="record.id"
+          class="record-row"
+          :class="{ 'actions-open': activeRecordActionId === record.id }"
+          :style="{ animationDelay: `${index * 35}ms` }"
         >
-          <text>{{ day.day }}</text>
-          <view v-if="day.count > 0" class="day-count numeric">
-            {{ day.count }}
+          <app-icon name="checkin" accent="green" size="sm" active />
+          <view class="record-main">
+            <text class="record-title">运动打卡</text>
+            <text class="record-detail">
+              {{ formatTime(record.checkedAt) }}
+            </text>
+          </view>
+          <view class="record-menu">
+            <button
+              class="more-action"
+              aria-label="更多操作"
+              hover-class="row-action-pressed"
+              @click="toggleRecordActions(record.id)"
+            >
+              <text class="i-carbon-overflow-menu-horizontal" />
+            </button>
+            <button
+              v-if="activeRecordActionId === record.id"
+              class="row-action danger"
+              hover-class="row-action-pressed"
+              @click="handleDelete(record)"
+            >
+              删除
+            </button>
           </view>
         </view>
       </view>
-    </app-card>
+    </view>
 
-    <text class="ios-section-title">今日记录</text>
-    <app-card class="record-group" accent="green">
-      <view v-if="todayRecords.length === 0" class="empty-state">
-        <app-icon name="target" accent="green" size="md" />
-        <text>还没有记录，点亮今天的第一格。</text>
-      </view>
-      <view
-        v-for="(record, index) in todayRecords"
-        v-else
-        :key="record.id"
-        class="record-row"
-        :style="{ animationDelay: `${index * 35}ms` }"
-      >
-        <app-icon name="checkin" accent="green" size="sm" active />
-        <view class="record-main">
-          <text class="record-title">运动打卡</text>
-          <text class="record-detail">{{ formatTime(record.checkedAt) }}</text>
+    <text class="ios-section-title">最近 7 天</text>
+    <view class="record-card-shell">
+      <view class="record-card" accent="orange" :show-accent="false">
+        <view v-if="recentRecords.length === 0" class="empty-state">
+          <app-icon name="streak" accent="orange" size="md" />
+          <text>持续运动后，时间线会在这里生长。</text>
         </view>
-        <button class="row-action danger" hover-class="row-action-pressed" @click="handleDelete(record)">
-          删除
+        <view
+          v-for="day in visibleRecentDaySummaries"
+          v-else
+          :key="day.key"
+          class="recent-row"
+          :class="{ muted: day.count === 0 }"
+        >
+          <view class="timeline-marker">
+            <view class="timeline-dot" :class="{ empty: day.count === 0 }" />
+          </view>
+          <view class="recent-copy">
+            <text class="recent-date">{{ day.label }}</text>
+            <text class="recent-event">
+              {{ day.count > 0 ? "运动打卡" : "未打卡" }}
+            </text>
+          </view>
+          <text class="recent-time numeric">
+            {{ day.count > 0 ? `${day.count} 次` : "未完成" }}
+          </text>
+        </view>
+        <button
+          v-if="recentRecords.length > 0"
+          class="recent-toggle"
+          hover-class="recent-toggle-pressed"
+          @click="recentExpanded = !recentExpanded"
+        >
+          {{ recentExpanded ? "收起" : "展开全部" }}
         </button>
       </view>
-    </app-card>
-
-    <text class="ios-section-title">最近记录</text>
-    <app-card class="record-group" accent="orange">
-      <view v-if="recentRecords.length === 0" class="empty-state">
-        <app-icon name="streak" accent="orange" size="md" />
-        <text>持续运动后，时间线会在这里生长。</text>
-      </view>
-      <view v-for="record in recentRecords" v-else :key="record.id" class="recent-row">
-        <view class="timeline-marker">
-          <view class="timeline-dot" />
-        </view>
-        <view class="recent-copy">
-          <text class="recent-date">{{ formatRecordDate(record.checkedAt) }}</text>
-          <text class="recent-event">运动打卡</text>
-        </view>
-        <text class="recent-time numeric">{{ formatTime(record.checkedAt) }}</text>
-      </view>
-    </app-card>
+    </view>
   </view>
 </template>
 
@@ -359,36 +514,36 @@ function formatRecordDate(value: string) {
   padding-left: 0;
 }
 
-.energy-card,
-.calendar-card,
-.record-group {
+.energy-card-shell,
+.calendar-card-shell,
+.record-card-shell {
   margin-right: var(--app-gutter);
   margin-left: var(--app-gutter);
   opacity: 0;
   transform: translateY(18rpx);
 }
 
-.ready .energy-card {
+.ready .energy-card-shell {
   animation: app-enter var(--app-motion-normal) var(--app-ease-out) both;
 }
 
-.ready .calendar-card {
+.ready .calendar-card-shell {
   animation: app-enter var(--app-motion-normal) 70ms var(--app-ease-out) both;
 }
 
-.ready .record-group {
+.ready .record-card-shell {
   animation: app-enter var(--app-motion-normal) 120ms var(--app-ease-out) both;
 }
 
-.energy-card {
-  padding: 30rpx;
+.energy-card-content {
+  padding: 42rpx 28rpx 30rpx;
+  box-sizing: border-box;
 }
 
-.energy-card.pulse {
+.energy-card-content.pulse {
   animation: success-pop 320ms var(--app-ease-spring) both;
 }
 
-.hero-top,
 .goal-panel,
 .calendar-head,
 .record-row,
@@ -398,12 +553,6 @@ function formatRecordDate(value: string) {
   align-items: center;
 }
 
-.hero-top {
-  justify-content: space-between;
-  gap: 28rpx;
-}
-
-.eyebrow,
 .goal-caption,
 .goal-status,
 .record-detail,
@@ -413,35 +562,17 @@ function formatRecordDate(value: string) {
   color: var(--app-label-secondary);
 }
 
-.eyebrow,
 .goal-caption {
   display: block;
   font-size: 24rpx;
   font-weight: 700;
 }
 
-.streak-value {
-  display: flex;
-  align-items: baseline;
-  gap: 10rpx;
-  margin-top: 8rpx;
-  color: var(--app-green);
-  font-size: 76rpx;
-  font-weight: 860;
-  line-height: 1.05;
-}
-
-.streak-unit {
-  font-size: 25rpx;
-  font-weight: 720;
-}
-
 .goal-panel {
   justify-content: space-between;
   gap: 24rpx;
-  margin-top: 28rpx;
-  padding: 20rpx 22rpx;
-  border-radius: 22rpx;
+  padding: 24rpx 26rpx;
+  border-radius: 24rpx;
   background: var(--app-fill);
 }
 
@@ -463,7 +594,15 @@ function formatRecordDate(value: string) {
 
 .checkin-action {
   position: relative;
-  margin-top: 26rpx;
+  margin-top: 30rpx;
+}
+
+.checkin-summary {
+  display: block;
+  margin-top: 22rpx;
+  color: var(--app-label-secondary);
+  font-size: 24rpx;
+  text-align: center;
 }
 
 .checkin-button {
@@ -471,15 +610,15 @@ function formatRecordDate(value: string) {
   z-index: 2;
   justify-content: center;
   width: 100%;
-  height: 124rpx;
+  height: 168rpx;
   gap: 16rpx;
   padding: 0;
-  border-radius: 30rpx;
+  border-radius: 34rpx;
   color: #fff;
   background: linear-gradient(135deg, var(--app-green), var(--app-green-deep));
   box-shadow:
-    0 12rpx 0 var(--app-green-deep),
-    0 22rpx 34rpx rgba(32, 196, 107, 0.2),
+    0 6rpx 0 var(--app-green-deep),
+    0 10rpx 20rpx rgba(34, 199, 111, 0.12),
     inset 0 3rpx 0 rgba(255, 255, 255, 0.25);
   transition:
     transform var(--app-motion-fast) var(--app-ease-out),
@@ -490,10 +629,10 @@ function formatRecordDate(value: string) {
 .checkin-button-pressed,
 .checkin-button.checking {
   opacity: 0.9;
-  transform: translateY(8rpx) scale(0.99);
+  transform: translateY(6rpx) scale(0.99);
   box-shadow:
     0 4rpx 0 var(--app-green-deep),
-    0 8rpx 18rpx rgba(32, 196, 107, 0.16);
+    0 6rpx 14rpx rgba(32, 196, 107, 0.1);
 }
 
 .button-copy {
@@ -503,26 +642,27 @@ function formatRecordDate(value: string) {
 }
 
 .button-main {
-  font-size: 34rpx;
-  font-weight: 800;
+  font-size: 42rpx;
+  font-weight: 860;
 }
 
 .button-sub {
-  margin-top: 5rpx;
-  font-size: 22rpx;
+  margin-top: 8rpx;
+  font-size: 25rpx;
   opacity: 0.82;
 }
 
 .success-ring {
   position: absolute;
   inset: 0;
-  border-radius: 30rpx;
+  border-radius: 34rpx;
   background: var(--app-green-soft);
   animation: ring-spread 420ms ease-out forwards;
 }
 
-.calendar-card {
-  padding: 28rpx 24rpx 26rpx;
+.calendar-card-content {
+  padding: 46rpx 24rpx 28rpx;
+  box-sizing: border-box;
 }
 
 .calendar-head {
@@ -602,19 +742,35 @@ function formatRecordDate(value: string) {
   background: transparent;
 }
 
-.calendar-day.active {
+.calendar-day.level-1 {
   color: var(--app-green);
   background: var(--app-green-soft);
   font-weight: 750;
 }
 
-.calendar-day.hot {
+.calendar-day.level-2 {
   color: #fff;
-  background: linear-gradient(135deg, var(--app-green), var(--app-blue));
+  background: var(--app-green);
+  font-weight: 780;
+}
+
+.calendar-day.level-3 {
+  color: #fff;
+  background: var(--app-green-deep);
+  font-weight: 800;
 }
 
 .calendar-day.today {
   box-shadow: inset 0 0 0 3rpx var(--app-green);
+}
+
+.calendar-day.selected {
+  background: var(--app-green-soft);
+  box-shadow: inset 0 0 0 3rpx var(--app-green);
+}
+
+.calendar-day.today.selected {
+  box-shadow: inset 0 0 0 4rpx var(--app-green);
 }
 
 .calendar-day.placeholder {
@@ -637,7 +793,39 @@ function formatRecordDate(value: string) {
   box-sizing: border-box;
 }
 
-.record-group {
+.heat-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8rpx;
+  margin-top: 22rpx;
+  color: var(--app-label-tertiary);
+  font-size: 19rpx;
+}
+
+.legend-dot {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 6rpx;
+}
+
+.legend-dot.level-0 {
+  background: var(--app-surface-tertiary);
+}
+
+.legend-dot.level-1 {
+  background: var(--app-green-soft);
+}
+
+.legend-dot.level-2 {
+  background: var(--app-green);
+}
+
+.legend-dot.level-3 {
+  background: var(--app-green-deep);
+}
+
+.record-card {
   overflow: hidden;
 }
 
@@ -659,6 +847,10 @@ function formatRecordDate(value: string) {
 .record-row {
   gap: 18rpx;
   animation: app-enter 230ms ease-out both;
+}
+
+.record-row.actions-open {
+  align-items: center;
 }
 
 .record-main {
@@ -683,15 +875,45 @@ function formatRecordDate(value: string) {
   font-size: 22rpx;
 }
 
+.record-menu {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.more-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52rpx;
+  height: 48rpx;
+  padding: 0;
+  border-radius: 14rpx;
+  color: var(--app-label-tertiary);
+  background: transparent;
+  font-size: 28rpx;
+  line-height: 48rpx;
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out,
+    background-color var(--app-motion-fast) ease-out;
+}
+
+.actions-open .more-action {
+  color: var(--app-label-secondary);
+  background: var(--app-fill);
+}
+
 .row-action {
-  min-width: 88rpx;
-  height: 56rpx;
-  padding: 0 16rpx;
-  border-radius: 16rpx;
-  color: var(--app-red);
-  background: var(--app-pink-soft);
-  font-size: 23rpx;
-  line-height: 56rpx;
+  min-width: 68rpx;
+  height: 48rpx;
+  padding: 0 12rpx;
+  border-radius: 14rpx;
+  color: rgba(255, 90, 110, 0.72);
+  background: rgba(255, 90, 110, 0.08);
+  font-size: 21rpx;
+  line-height: 48rpx;
   transition:
     transform var(--app-motion-fast) ease-out,
     opacity var(--app-motion-fast) ease-out;
@@ -699,6 +921,11 @@ function formatRecordDate(value: string) {
 
 .recent-row {
   justify-content: flex-start;
+  min-height: 92rpx;
+}
+
+.recent-row.muted {
+  opacity: 0.72;
 }
 
 .timeline-marker {
@@ -715,7 +942,7 @@ function formatRecordDate(value: string) {
   left: 21rpx;
   width: 2rpx;
   background: var(--app-separator);
-  content: '';
+  content: "";
 }
 
 .recent-row:last-child .timeline-marker::after {
@@ -734,6 +961,11 @@ function formatRecordDate(value: string) {
   box-sizing: content-box;
 }
 
+.timeline-dot.empty {
+  border-color: var(--app-surface-tertiary);
+  background: var(--app-label-tertiary);
+}
+
 .recent-copy {
   flex: 1;
   min-width: 0;
@@ -748,6 +980,30 @@ function formatRecordDate(value: string) {
 .recent-time {
   flex: 0 0 auto;
   margin: 0;
+}
+
+.recent-row.muted .recent-time {
+  color: var(--app-label-tertiary);
+  font-size: 21rpx;
+}
+
+.recent-toggle {
+  height: 74rpx;
+  margin: 8rpx 24rpx 20rpx;
+  border-radius: 18rpx;
+  color: var(--app-green);
+  background: var(--app-green-soft);
+  font-size: 24rpx;
+  font-weight: 680;
+  line-height: 74rpx;
+  transition:
+    transform var(--app-motion-fast) var(--app-ease-out),
+    opacity var(--app-motion-fast) ease-out;
+}
+
+.recent-toggle-pressed {
+  opacity: 0.78;
+  transform: scale(0.98);
 }
 
 .empty-state {
