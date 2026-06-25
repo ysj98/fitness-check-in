@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify'
+import type { FastifyRequest } from 'fastify'
 import type { AppDb, WxSession } from './types.js'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
@@ -10,7 +10,7 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import Fastify from 'fastify'
 import { z, ZodError } from 'zod'
-import { addChinaDays, formatChinaDate, getChinaDayRange, getChinaMonthRange, getChinaWeekRange } from './date.js'
+import { addChinaDays, formatChinaDate, getChinaDayRange, getChinaMonthRange } from './date.js'
 import { exchangeWeChatCode } from './wechat.js'
 
 declare module '@fastify/jwt' {
@@ -214,8 +214,6 @@ function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
     heightCm: toNumber(user.heightCm),
     targetWeightKg: toNumber(user.targetWeightKg),
     weightUnit: user.weightUnit || 'kg',
-    role: 'user',
-    roles: ['user'],
   }
 }
 
@@ -323,14 +321,8 @@ function getPublicUrl(request: FastifyRequest, urlPath: string) {
   return `${protocol}://${host}${urlPath}`
 }
 
-async function requireAuth(app: FastifyInstance, request: FastifyRequest) {
+async function requireAuth(request: FastifyRequest) {
   await request.jwtVerify()
-  const user = await app.db.user.findUnique({ where: { id: request.user.userId } })
-  if (!user) {
-    const error = new Error('User not found') as Error & { statusCode: number }
-    error.statusCode = 401
-    throw error
-  }
 }
 
 declare module 'fastify' {
@@ -344,6 +336,10 @@ export async function createApp(options: CreateAppOptions) {
     logger: process.env.NODE_ENV !== 'test',
   })
   const uploadDir = options.uploadDir || path.resolve(process.cwd(), 'uploads')
+  const jwtSecret = process.env.JWT_SECRET
+  if (!jwtSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET is required in production')
+  }
 
   app.addContentTypeParser(/^multipart\/form-data/i, { parseAs: 'buffer' }, (request, body, done) => {
     done(null, parseAvatarUpload(body as Buffer, request.headers['content-type']))
@@ -355,7 +351,7 @@ export async function createApp(options: CreateAppOptions) {
     origin: true,
   })
   await app.register(jwt, {
-    secret: process.env.JWT_SECRET || 'dev-secret-change-me',
+    secret: jwtSecret || 'development-only-secret',
   })
 
   app.setErrorHandler((error, _request, reply) => {
@@ -388,18 +384,7 @@ export async function createApp(options: CreateAppOptions) {
     reply.send(ok({
       token,
       expiresIn: 30 * 24 * 60 * 60,
-      user: {
-        id: user.id,
-        openid: user.openid,
-        nickname: user.nickname,
-        avatarUrl: user.avatarUrl,
-        gender: user.gender,
-        birthday: user.birthday,
-        dailyGoal: user.dailyGoal || 1,
-        heightCm: toNumber(user.heightCm),
-        targetWeightKg: toNumber(user.targetWeightKg),
-        weightUnit: user.weightUnit || 'kg',
-      },
+      user: serializeUser(user),
     }))
   })
 
@@ -416,7 +401,7 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.patch('/api/user/profile', async (request) => {
-    await request.jwtVerify()
+    await requireAuth(request)
     const body = profileSchema.parse(request.body)
     const user = await app.db.user.update({
       where: { id: request.user.userId },
@@ -434,7 +419,7 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.patch('/api/user/weight-settings', async (request) => {
-    await requireAuth(app, request)
+    await requireAuth(request)
     const body = weightSettingsSchema.parse(request.body)
     const user = await app.db.user.update({
       where: { id: request.user.userId },
@@ -448,14 +433,14 @@ export async function createApp(options: CreateAppOptions) {
     return ok(serializeUser(user), '设置已保存')
   })
 
-  app.post('/api/user/avatar', async (request) => {
-    await request.jwtVerify()
+  app.post('/api/user/avatar', async (request, reply) => {
+    await requireAuth(request)
     const file = request.body as UploadedFile | null
     if (!file || !file.data.length) {
-      return fail('头像文件不能为空', 400)
+      return reply.code(400).send(fail('头像文件不能为空', 400))
     }
     if (!file.mimeType.startsWith('image/')) {
-      return fail('只支持图片文件', 400)
+      return reply.code(400).send(fail('只支持图片文件', 400))
     }
 
     const avatarDir = path.join(uploadDir, 'avatars')
@@ -470,7 +455,7 @@ export async function createApp(options: CreateAppOptions) {
 
   app.addHook('preHandler', async (request) => {
     if (request.routeOptions.url?.startsWith('/api/checkins') || request.routeOptions.url?.startsWith('/api/weights')) {
-      await requireAuth(app, request)
+      await requireAuth(request)
     }
   })
 
@@ -683,16 +668,8 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.get('/api/checkins/stats', async (request) => {
-    const { start, end } = getChinaWeekRange()
     const todayRange = getChinaDayRange()
-    const [weekRecords, allRecords, todayCount, user] = await Promise.all([
-      app.db.checkIn.findMany({
-        where: {
-          userId: request.user.userId,
-          checkedAt: { gte: start, lt: end },
-        },
-        orderBy: { checkedAt: 'asc' },
-      }),
+    const [allRecords, todayCount, user] = await Promise.all([
       app.db.checkIn.findMany({
         where: { userId: request.user.userId },
         orderBy: { checkedAt: 'desc' },
@@ -710,18 +687,6 @@ export async function createApp(options: CreateAppOptions) {
       error.statusCode = 401
       throw error
     }
-    const weekCounts = weekRecords.reduce<Record<string, number>>((result, record) => {
-      const key = formatChinaDate(record.checkedAt)
-      result[key] = (result[key] || 0) + 1
-      return result
-    }, {})
-    const weekDays = Array.from({ length: 7 }, (_, index) => {
-      const date = formatChinaDate(addChinaDays(start, index))
-      return {
-        date,
-        count: weekCounts[date] || 0,
-      }
-    })
     const checkedDateSet = new Set(allRecords.map(record => formatChinaDate(record.checkedAt)))
     let currentStreak = 0
     let cursor = getChinaDayRange().start
@@ -735,12 +700,7 @@ export async function createApp(options: CreateAppOptions) {
     const todayCompleted = todayCount >= todayGoal
 
     return ok({
-      weekStart: formatChinaDate(start),
-      weekEnd: formatChinaDate(addChinaDays(end, -1)),
-      weekTotal: weekRecords.length,
-      activeDays: weekDays.filter(day => day.count > 0).length,
       currentStreak,
-      weekDays,
       totalCount,
       todayGoal,
       todayCompleted,
@@ -748,7 +708,7 @@ export async function createApp(options: CreateAppOptions) {
     })
   })
 
-  app.delete('/api/checkins/:id', async (request) => {
+  app.delete('/api/checkins/:id', async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).parse(request.params)
     const record = await app.db.checkIn.findFirst({
       where: {
@@ -758,7 +718,7 @@ export async function createApp(options: CreateAppOptions) {
     })
 
     if (!record) {
-      return fail('打卡记录不存在', 404)
+      return reply.code(404).send(fail('打卡记录不存在', 404))
     }
 
     await app.db.checkIn.delete({ where: { id: params.id } })

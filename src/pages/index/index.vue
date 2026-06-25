@@ -24,12 +24,7 @@ interface CalendarDay {
 }
 
 const emptyStats: CheckInStatsRes = {
-  weekStart: '',
-  weekEnd: '',
-  weekTotal: 0,
-  activeDays: 0,
   currentStreak: 0,
-  weekDays: [],
   totalCount: 0,
   todayGoal: 1,
   todayCompleted: false,
@@ -117,18 +112,12 @@ onShow(() => {
 
 async function initPage() {
   loading.value = true
-  console.log(123)
   try {
-    console.log(456)
-
     await ensureLogin()
-    console.log(0)
-
     await loadDashboard()
   }
-  catch (err) {
-    console.log(111111233)
-    console.log(err)
+  catch {
+    uni.showToast({ title: '数据加载失败，请重试', icon: 'none' })
   }
   finally {
     loading.value = false
@@ -136,9 +125,7 @@ async function initPage() {
 }
 
 async function ensureLogin() {
-  console.log(789)
-
-  if (tokenStore.updateNowTime().hasLogin) {
+  if (tokenStore.hasLogin()) {
     loginReady.value = true
     return
   }
@@ -304,7 +291,6 @@ function formatRecordDate(value: string) {
         </button>
         <view class="month-title-wrap" @click="backToCurrentMonth">
           <text class="month-title">{{ monthTitle }}</text>
-          <text class="month-note">点按返回本月</text>
         </view>
         <button class="icon-button" aria-label="下个月" hover-class="icon-button-pressed" @click="changeMonth(1)">
           <text class="i-carbon-chevron-right" />
@@ -360,7 +346,13 @@ function formatRecordDate(value: string) {
         暂无记录
       </view>
       <view v-for="record in recentRecords" v-else :key="record.id" class="recent-row">
-        <text class="recent-date">{{ formatRecordDate(record.checkedAt) }}</text>
+        <view class="timeline-marker">
+          <view class="timeline-dot" />
+        </view>
+        <view class="recent-copy">
+          <text class="recent-date">{{ formatRecordDate(record.checkedAt) }}</text>
+          <text class="recent-event">运动打卡</text>
+        </view>
         <text class="recent-time numeric">{{ formatTime(record.checkedAt) }}</text>
       </view>
     </view>
@@ -371,10 +363,6 @@ function formatRecordDate(value: string) {
 .checkin-page {
   padding-right: 0;
   padding-left: 0;
-}
-
-button::after {
-  border: 0;
 }
 
 .activity-card,
@@ -399,8 +387,21 @@ button::after {
 }
 
 .activity-card {
+  position: relative;
   padding: 30rpx;
+  border-color: rgba(52, 199, 89, 0.18);
   overflow: hidden;
+}
+
+.activity-card::before {
+  position: absolute;
+  top: 0;
+  right: 30rpx;
+  left: 30rpx;
+  height: 5rpx;
+  border-radius: 0 0 999rpx 999rpx;
+  background: var(--app-green);
+  content: '';
 }
 
 .activity-card.pulse {
@@ -419,6 +420,7 @@ button::after {
 .activity-head {
   justify-content: space-between;
   gap: 28rpx;
+  padding-top: 6rpx;
 }
 
 .activity-label,
@@ -426,8 +428,7 @@ button::after {
 .goal-status,
 .ring-label,
 .record-detail,
-.recent-time,
-.month-note {
+.recent-time {
   color: var(--app-label-secondary);
 }
 
@@ -456,6 +457,9 @@ button::after {
 
 .goal-copy {
   min-width: 190rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 20rpx;
+  background: var(--app-fill);
   text-align: right;
 }
 
@@ -529,7 +533,7 @@ button::after {
   width: 100%;
   height: 138rpx;
   padding: 0;
-  border-radius: 30rpx;
+  border-radius: 28rpx;
   color: #fff;
   background: var(--app-green);
   box-shadow:
@@ -570,13 +574,13 @@ button::after {
 .success-ring {
   position: absolute;
   inset: 0;
-  border-radius: 30rpx;
+  border-radius: 28rpx;
   background: var(--app-green-soft);
   animation: ring-spread 340ms ease-out forwards;
 }
 
 .calendar-card {
-  padding: 26rpx 22rpx 24rpx;
+  padding: 28rpx 24rpx 26rpx;
 }
 
 .calendar-head {
@@ -611,19 +615,13 @@ button::after {
   text-align: center;
 }
 
-.month-title,
-.month-note {
+.month-title {
   display: block;
 }
 
 .month-title {
-  font-size: 30rpx;
-  font-weight: 700;
-}
-
-.month-note {
-  margin-top: 3rpx;
-  font-size: 20rpx;
+  font-size: 31rpx;
+  font-weight: 720;
 }
 
 .calendar-grid {
@@ -700,6 +698,11 @@ button::after {
   box-sizing: border-box;
 }
 
+.recent-row {
+  min-height: 112rpx;
+  padding-left: 0;
+}
+
 .record-row:last-child,
 .recent-row:last-child {
   border-bottom: 0;
@@ -763,7 +766,52 @@ button::after {
 }
 
 .recent-row {
-  justify-content: space-between;
+  justify-content: flex-start;
+}
+
+.timeline-marker {
+  position: relative;
+  align-self: stretch;
+  width: 44rpx;
+  margin-right: 12rpx;
+}
+
+.timeline-marker::after {
+  position: absolute;
+  top: 54rpx;
+  bottom: -38rpx;
+  left: 21rpx;
+  width: 2rpx;
+  background: var(--app-separator);
+  content: '';
+}
+
+.recent-row:last-child .timeline-marker::after {
+  display: none;
+}
+
+.timeline-dot {
+  position: absolute;
+  top: 34rpx;
+  left: 13rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border: 5rpx solid var(--app-green-soft);
+  border-radius: 50%;
+  background: var(--app-green);
+  box-sizing: content-box;
+}
+
+.recent-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-event {
+  display: block;
+  margin-top: 5rpx;
+  color: var(--app-label-secondary);
+  font-size: 22rpx;
 }
 
 .recent-time {

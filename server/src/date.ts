@@ -14,19 +14,6 @@ export function getChinaDayRange(date = new Date()) {
   }
 }
 
-export function getChinaWeekRange(date = new Date()) {
-  const dayRange = getChinaDayRange(date)
-  const chinaDate = new Date(date.getTime() + CHINA_OFFSET_MS)
-  const day = chinaDate.getUTCDay()
-  const daysFromMonday = day === 0 ? 6 : day - 1
-  const start = dayRange.start.getTime() - daysFromMonday * 24 * 60 * 60 * 1000
-
-  return {
-    start: new Date(start),
-    end: new Date(start + 7 * 24 * 60 * 60 * 1000),
-  }
-}
-
 export function addChinaDays(date: Date, days: number) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000)
 }

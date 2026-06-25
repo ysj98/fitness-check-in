@@ -7,8 +7,6 @@ export default uniHelper({
   ignores: [
     // 忽略uni_modules目录
     '**/uni_modules/',
-    // 忽略原生插件目录
-    '**/nativeplugins/',
     'dist',
     // unplugin-auto-import 生成的类型文件，每次提交都改变，所以加入这里吧，与 .gitignore 配合使用
     'auto-import.d.ts',
@@ -17,8 +15,10 @@ export default uniHelper({
     // 插件生成的文件
     'src/pages.json',
     'src/manifest.json',
-    // 忽略自动生成文件
-    'src/service/**',
+    // uCharts 为第三方组件源码，保持供应商原始实现。
+    'src/components/qiun-*/**',
+    // 后端发布目录由 build:release 生成。
+    'server/release/**',
   ],
   // https://eslint-config.antfu.me/rules
   rules: {

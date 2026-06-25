@@ -1,16 +1,17 @@
 import type { IUserInfoRes } from '@/api/types/login'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import {
-  getUserInfo,
-} from '@/api/login'
+import { getUserInfo } from '@/api/login'
 
-// 初始化状态
-const userInfoState: IUserInfoRes = {
+const defaultAvatar = '/static/images/default-avatar.png'
+const initialUserInfo: IUserInfoRes = {
   userId: -1,
   username: '',
   nickname: '',
-  avatar: '/static/images/default-avatar.png',
+  avatar: defaultAvatar,
+  avatarUrl: '',
+  gender: '',
+  birthday: '',
   dailyGoal: 1,
   heightCm: null,
   targetWeightKg: null,
@@ -20,45 +21,33 @@ const userInfoState: IUserInfoRes = {
 export const useUserStore = defineStore(
   'user',
   () => {
-    // 定义用户信息
-    const userInfo = ref<IUserInfoRes>({ ...userInfoState })
-    // 设置用户信息
-    const setUserInfo = (val: IUserInfoRes) => {
-      console.log('设置用户信息', val)
-      // 若头像为空 则使用默认头像
-      if (!val.avatar) {
-        val.avatar = userInfoState.avatar
+    const userInfo = ref<IUserInfoRes>({ ...initialUserInfo })
+
+    function setUserInfo(value: IUserInfoRes) {
+      userInfo.value = {
+        ...initialUserInfo,
+        ...value,
+        avatar: value.avatar || value.avatarUrl || defaultAvatar,
+        dailyGoal: value.dailyGoal || 1,
+        weightUnit: value.weightUnit || 'kg',
       }
-      val.dailyGoal = val.dailyGoal || userInfoState.dailyGoal
-      val.weightUnit = val.weightUnit || userInfoState.weightUnit
-      userInfo.value = val
-    }
-    const setUserAvatar = (avatar: string) => {
-      userInfo.value.avatar = avatar
-      console.log('设置用户头像', avatar)
-      console.log('userInfo', userInfo.value)
-    }
-    // 删除用户信息
-    const clearUserInfo = () => {
-      userInfo.value = { ...userInfoState }
-      uni.removeStorageSync('user')
     }
 
-    /**
-     * 获取用户信息
-     */
-    const fetchUserInfo = async () => {
-      const res = await getUserInfo()
-      setUserInfo(res)
-      return res
+    function clearUserInfo() {
+      userInfo.value = { ...initialUserInfo }
+    }
+
+    async function fetchUserInfo() {
+      const result = await getUserInfo()
+      setUserInfo(result)
+      return result
     }
 
     return {
-      userInfo,
       clearUserInfo,
       fetchUserInfo,
       setUserInfo,
-      setUserAvatar,
+      userInfo,
     }
   },
   {

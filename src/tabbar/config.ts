@@ -1,68 +1,14 @@
 import type { TabBar } from '@uni-helper/vite-plugin-uni-pages'
-import type { CustomTabBarItem, NativeTabBarItem } from './types'
+import type { CustomTabBarItem } from './types'
 
-export const TABBAR_STRATEGY_MAP = {
-  NO_TABBAR: 0,
-  NATIVE_TABBAR: 1,
-  CUSTOM_TABBAR: 2,
-}
-
-export const selectedTabbarStrategy = TABBAR_STRATEGY_MAP.CUSTOM_TABBAR
-
-export const nativeTabbarList: NativeTabBarItem[] = [
-  {
-    iconPath: 'static/tabbar/home.png',
-    selectedIconPath: 'static/tabbar/homeHL.png',
-    pagePath: 'pages/index/index',
-    text: '打卡',
-  },
-  {
-    iconPath: 'static/tabbar/scan.png',
-    selectedIconPath: 'static/tabbar/scan.png',
-    pagePath: 'pages/weight/index',
-    text: '体重',
-  },
-  {
-    iconPath: 'static/tabbar/personal.png',
-    selectedIconPath: 'static/tabbar/personalHL.png',
-    pagePath: 'pages/me/me',
-    text: '我的',
-  },
+export const tabbarItems: CustomTabBarItem[] = [
+  { text: '打卡', pagePath: 'pages/index/index', icon: 'i-carbon-calendar' },
+  { text: '体重', pagePath: 'pages/weight/index', icon: 'i-carbon-scale' },
+  { text: '我的', pagePath: 'pages/me/me', icon: 'i-carbon-user' },
 ]
 
-export const customTabbarList: CustomTabBarItem[] = [
-  {
-    text: '打卡',
-    pagePath: 'pages/index/index',
-    iconType: 'unocss',
-    icon: 'i-carbon-calendar',
-  },
-  {
-    text: '体重',
-    pagePath: 'pages/weight/index',
-    iconType: 'unocss',
-    icon: 'i-carbon-scale',
-  },
-  {
-    pagePath: 'pages/me/me',
-    text: '我的',
-    iconType: 'unocss',
-    icon: 'i-carbon-user',
-  },
-]
-
-export const tabbarCacheEnable
-  = [TABBAR_STRATEGY_MAP.NATIVE_TABBAR, TABBAR_STRATEGY_MAP.CUSTOM_TABBAR].includes(selectedTabbarStrategy)
-
-export const customTabbarEnable = [TABBAR_STRATEGY_MAP.CUSTOM_TABBAR].includes(selectedTabbarStrategy)
-
-export const needHideNativeTabbar = selectedTabbarStrategy === TABBAR_STRATEGY_MAP.CUSTOM_TABBAR
-
-const _tabbarList = customTabbarEnable ? customTabbarList.map(item => ({ text: item.text, pagePath: item.pagePath })) : nativeTabbarList
-export const tabbarList = customTabbarEnable ? customTabbarList : nativeTabbarList
-
-const _tabbar: TabBar = {
-  custom: selectedTabbarStrategy === TABBAR_STRATEGY_MAP.CUSTOM_TABBAR,
+export const tabBar: TabBar = {
+  custom: true,
   color: '#8e8e93',
   selectedColor: '#34c759',
   backgroundColor: '#f9f9f9',
@@ -71,7 +17,5 @@ const _tabbar: TabBar = {
   fontSize: '10px',
   iconWidth: '24px',
   spacing: '3px',
-  list: _tabbarList as unknown as TabBar['list'],
+  list: tabbarItems.map(({ text, pagePath }) => ({ text, pagePath })) as TabBar['list'],
 }
-
-export const tabBar = tabbarCacheEnable ? _tabbar : {}

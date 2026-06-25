@@ -15,11 +15,6 @@ export interface MonthCheckInRes {
   days: Record<string, number>
 }
 
-export interface WeekDayStat {
-  date: string
-  count: number
-}
-
 export interface CheckInBadge {
   key: string
   name: string
@@ -28,12 +23,7 @@ export interface CheckInBadge {
 }
 
 export interface CheckInStatsRes {
-  weekStart: string
-  weekEnd: string
-  weekTotal: number
-  activeDays: number
   currentStreak: number
-  weekDays: WeekDayStat[]
   totalCount: number
   todayGoal: number
   todayCompleted: boolean

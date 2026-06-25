@@ -11,9 +11,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@img/*": [
-        "./src/static/*"
       ]
     },
     "resolveJsonModule": true,
@@ -22,12 +19,10 @@
       "@uni-helper/uni-types",
       "@uni-helper/vite-plugin-uni-pages",
       "miniprogram-api-typings",
-      "z-paging/types",
       "vitest/globals",
       "./src/types/async-component.d.ts",
       "./src/types/async-import.d.ts",
-      "./src/typings.d.ts",
-      "@wot-ui/ui/global"
+      "./src/typings.d.ts"
     ],
     "allowJs": true,
     "noImplicitThis": true,

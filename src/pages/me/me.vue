@@ -50,13 +50,13 @@ onShow(() => {
 })
 
 async function initProfile() {
-  if (!tokenStore.updateNowTime().hasLogin) {
+  if (!tokenStore.hasLogin()) {
     await tokenStore.wxLogin()
   }
-  const [userInfo, stats] = await Promise.all([
-    userStore.fetchUserInfo(),
-    getCheckInStats(),
-  ])
+  else {
+    await userStore.fetchUserInfo()
+  }
+  const [userInfo, stats] = [userStore.userInfo, await getCheckInStats()]
   form.nickname = userInfo.nickname || ''
   form.avatarUrl = userInfo.avatarUrl || userInfo.avatar || ''
   form.gender = userInfo.gender || ''
@@ -168,7 +168,6 @@ async function handleSave() {
         <text class="profile-title">{{ form.nickname || '微信用户' }}</text>
         <text class="profile-subtitle">{{ unlockedBadgeCount }} 项成就已达成</text>
       </view>
-      <text class="profile-chevron i-carbon-chevron-right" />
     </view>
 
     <text class="ios-section-title">个人资料</text>
@@ -292,10 +291,6 @@ async function handleSave() {
   padding-left: 0;
 }
 
-button::after {
-  border: 0;
-}
-
 .profile-summary,
 .form-section,
 .appearance-card,
@@ -306,12 +301,26 @@ button::after {
 }
 
 .profile-summary {
+  position: relative;
   display: flex;
   align-items: center;
-  min-height: 154rpx;
-  padding: 24rpx 28rpx;
+  min-height: 164rpx;
+  padding: 28rpx;
+  border-color: rgba(0, 122, 255, 0.14);
   box-sizing: border-box;
-  animation: enter var(--app-motion-normal) ease-out both;
+  animation: enter var(--app-motion-normal) var(--app-ease-out) both;
+  overflow: hidden;
+}
+
+.profile-summary::before {
+  position: absolute;
+  top: 0;
+  right: 28rpx;
+  left: 28rpx;
+  height: 5rpx;
+  border-radius: 0 0 999rpx 999rpx;
+  background: var(--app-blue);
+  content: '';
 }
 
 .avatar-button {
@@ -363,8 +372,8 @@ button::after {
 }
 
 .profile-title {
-  font-size: 34rpx;
-  font-weight: 700;
+  font-size: 36rpx;
+  font-weight: 740;
 }
 
 .profile-subtitle {
@@ -373,7 +382,6 @@ button::after {
   font-size: 23rpx;
 }
 
-.profile-chevron,
 .field-chevron {
   flex: 0 0 auto;
   color: var(--app-label-tertiary);
@@ -382,7 +390,7 @@ button::after {
 
 .form-section {
   overflow: hidden;
-  animation: enter var(--app-motion-normal) 50ms ease-out both;
+  animation: enter var(--app-motion-normal) 50ms var(--app-ease-out) both;
 }
 
 .field {
@@ -432,8 +440,8 @@ button::after {
 }
 
 .purple-icon {
-  color: #af52de;
-  background: rgba(175, 82, 222, 0.14);
+  color: var(--app-purple);
+  background: var(--app-purple-soft);
 }
 
 .field-label {
@@ -482,6 +490,7 @@ button::after {
   min-height: 104rpx;
   padding: 16rpx 24rpx 16rpx 28rpx;
   box-sizing: border-box;
+  animation: enter var(--app-motion-normal) 70ms var(--app-ease-out) both;
 }
 
 .appearance-label {
@@ -533,19 +542,39 @@ button::after {
 }
 
 .badge-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
+  display: block;
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
+  overflow: hidden;
+  animation: enter var(--app-motion-normal) 90ms var(--app-ease-out) both;
+  box-sizing: border-box;
+}
+
+.theme-dark .badge-grid {
+  border-color: rgba(255, 255, 255, 0.055);
 }
 
 .badge-item {
   position: relative;
   display: flex;
+  align-items: center;
   min-width: 0;
-  min-height: 180rpx;
-  padding: 22rpx;
+  min-height: 128rpx;
+  margin-left: 28rpx;
+  padding: 22rpx 24rpx 22rpx 0;
+  border: 0;
+  border-bottom: 1rpx solid var(--app-separator);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   box-sizing: border-box;
   opacity: 0.62;
+}
+
+.badge-item:last-child {
+  border-bottom: 0;
 }
 
 .badge-item.unlocked {
@@ -600,11 +629,11 @@ button::after {
 
 .badge-state,
 .badge-index {
-  position: absolute;
-  right: 18rpx;
-  bottom: 16rpx;
+  position: static;
+  flex: 0 0 auto;
+  margin-left: 14rpx;
   color: var(--app-green);
-  font-size: 24rpx;
+  font-size: 27rpx;
 }
 
 .badge-index {
@@ -618,18 +647,24 @@ button::after {
   border-radius: var(--app-control-radius);
   color: #fff;
   background: var(--app-green);
-  box-shadow: 0 10rpx 24rpx rgba(52, 199, 89, 0.18);
+  box-shadow:
+    0 10rpx 0 rgba(20, 120, 48, 0.72),
+    0 18rpx 30rpx rgba(52, 199, 89, 0.16);
   font-size: 30rpx;
   font-weight: 700;
   line-height: 92rpx;
   transition:
-    transform var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) var(--app-ease-out),
+    box-shadow var(--app-motion-fast) ease-out,
     opacity var(--app-motion-fast) ease-out;
 }
 
 .save-button-pressed {
   opacity: 0.82;
-  transform: scale(0.985);
+  transform: translateY(6rpx) scale(0.99);
+  box-shadow:
+    0 4rpx 0 rgba(20, 120, 48, 0.72),
+    0 8rpx 18rpx rgba(52, 199, 89, 0.14);
 }
 
 .save-button[disabled] {

@@ -1,50 +1,60 @@
 <script setup lang="ts">
 import type { CustomTabBarItem } from './types'
-import { tabbarStore } from './store'
 
 defineProps<{
   item: CustomTabBarItem
-  index: number
-  isBulge?: boolean
+  active?: boolean
 }>()
-
-function getImageByIndex(index: number, item: CustomTabBarItem) {
-  if (!item.iconActive) {
-    console.warn('image 模式下，需要配置 iconActive (高亮时的图片），否则无法切换高亮图片')
-    return item.icon
-  }
-  return tabbarStore.curIdx === index ? item.iconActive : item.icon
-}
 </script>
 
 <template>
-  <view class="flex flex-col items-center justify-center">
-    <template v-if="item.iconType === 'uiLib'">
-      <!-- TODO: 以下内容请根据选择的UI库自行替换 -->
-      <!-- 如：<wd-icon name="home" /> (https://wot-design-uni.cn/component/icon.html) -->
-      <!-- 如：<uv-icon name="home" /> (https://www.uvui.cn/components/icon.html) -->
-      <!-- 如：<sar-icon name="image" /> (https://sard.wzt.zone/sard-uniapp-docs/components/icon)(sar没有home图标^_^) -->
-      <!-- <wd-icon :name="item.icon" size="20" /> -->
-    </template>
-    <template v-if="item.iconType === 'unocss' || item.iconType === 'iconfont'">
-      <view :class="[item.icon, isBulge ? 'text-80px' : 'text-22px']" />
-    </template>
-    <template v-if="item.iconType === 'image'">
-      <image :src="getImageByIndex(index, item)" mode="scaleToFill" :class="isBulge ? 'h-80px w-80px' : 'h-24px w-24px'" />
-    </template>
-    <view v-if="!isBulge" class="mt-2px text-11px">
-      {{ item.text }}
+  <view class="tab-item" :class="{ active }">
+    <view class="icon-wrap">
+      <view class="tab-icon" :class="item.icon" />
     </view>
-    <!-- 角标显示 -->
-    <view v-if="item.badge">
-      <template v-if="item.badge === 'dot'">
-        <view class="absolute right-0 top-0 h-2 w-2 rounded-full bg-#f56c6c" />
-      </template>
-      <template v-else>
-        <view class="absolute top-0 box-border h-5 min-w-5 center rounded-full bg-#f56c6c px-1 text-center text-xs text-white -right-3">
-          {{ item.badge > 99 ? '99+' : item.badge }}
-        </view>
-      </template>
+    <view class="tab-label">
+      {{ item.text }}
     </view>
   </view>
 </template>
+
+<style scoped lang="scss">
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 112rpx;
+}
+
+.icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 70rpx;
+  height: 42rpx;
+  border-radius: 999rpx;
+  transition:
+    background-color var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) var(--app-ease-out);
+}
+
+.active .icon-wrap {
+  background: var(--app-green-soft);
+}
+
+.tab-icon {
+  font-size: 42rpx;
+}
+
+.tab-label {
+  margin-top: 3rpx;
+  font-size: 20rpx;
+  font-weight: 560;
+  line-height: 1.15;
+}
+
+.active .tab-label {
+  font-weight: 700;
+}
+</style>

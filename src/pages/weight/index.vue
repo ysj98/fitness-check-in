@@ -116,7 +116,7 @@ onShow(() => {
 })
 
 async function ensureLogin() {
-  if (!tokenStore.updateNowTime().hasLogin) {
+  if (!tokenStore.hasLogin()) {
     await tokenStore.wxLogin()
   }
 }
@@ -570,6 +570,10 @@ function getChinaDateTimeParts(date: Date) {
   background: var(--app-bg);
 }
 
+button::after {
+  border: 0;
+}
+
 .hero,
 .summary-grid,
 .record-button,
@@ -580,11 +584,67 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .hero {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-height: 236rpx;
   padding: 30rpx;
-  border: 0;
+  border-color: rgba(0, 122, 255, 0.16);
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
   box-shadow: var(--app-shadow);
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: content-enter var(--app-motion-normal) var(--app-ease-out) both;
+}
+
+.hero::before {
+  position: absolute;
+  top: 0;
+  right: 30rpx;
+  left: 30rpx;
+  height: 5rpx;
+  border-radius: 0 0 999rpx 999rpx;
+  background: var(--app-blue);
+  content: '';
+}
+
+.hero.pulse {
+  animation: success-pop 280ms var(--app-ease-out) both;
+}
+
+.hero-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-label,
+.hero-change {
+  display: block;
+}
+
+.hero-label {
+  padding-top: 6rpx;
+  font-size: 24rpx;
+  font-weight: 650;
+}
+
+.weight-value {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+  margin-top: 9rpx;
+}
+
+.weight-unit {
+  font-size: 28rpx;
+  font-weight: 650;
+}
+
+.hero-change {
+  margin-top: 8rpx;
+  font-size: 23rpx;
 }
 
 .hero-label,
@@ -626,18 +686,61 @@ function getChinaDateTimeParts(date: Date) {
   background: var(--app-blue-soft);
   font-size: 32rpx;
   line-height: 76rpx;
+  transition:
+    transform var(--app-motion-fast) var(--app-ease-out),
+    opacity var(--app-motion-fast) ease-out;
 }
 
 .summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14rpx;
+  margin-top: 16rpx;
+  animation: content-enter var(--app-motion-normal) 45ms var(--app-ease-out) both;
 }
 
 .summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 168rpx;
   padding: 24rpx 12rpx;
-  border: 0;
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
   box-shadow: var(--app-shadow);
+  box-sizing: border-box;
+}
+
+.theme-dark .summary-item {
+  border-color: rgba(255, 255, 255, 0.055);
+}
+
+.summary-label,
+.summary-value,
+.summary-note {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.summary-label {
+  font-size: 21rpx;
+  font-weight: 600;
+}
+
+.summary-value {
+  margin-top: 10rpx;
+  font-size: 36rpx;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.summary-note {
+  margin-top: 7rpx;
+  font-size: 20rpx;
 }
 
 .summary-value {
@@ -657,7 +760,13 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .height-action {
+  width: 100%;
+  min-height: 52rpx;
+  padding: 0;
+  font-size: 21rpx;
+  line-height: 52rpx;
   color: var(--app-orange);
+  background: transparent;
 }
 
 .record-button {
@@ -671,7 +780,20 @@ function getChinaDateTimeParts(date: Date) {
   background: var(--app-green);
   box-shadow: 0 10rpx 24rpx rgba(52, 199, 89, 0.18);
   font-size: 30rpx;
+  font-weight: 700;
   line-height: 94rpx;
+  transition:
+    transform var(--app-motion-fast) var(--app-ease-out),
+    opacity var(--app-motion-fast) ease-out,
+    box-shadow var(--app-motion-fast) ease-out;
+  animation: content-enter var(--app-motion-normal) 80ms var(--app-ease-out) both;
+}
+
+.record-button-pressed,
+.control-pressed,
+.mini-button-pressed {
+  opacity: 0.78;
+  transform: scale(0.975);
 }
 
 .section {
@@ -681,19 +803,58 @@ function getChinaDateTimeParts(date: Date) {
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
   box-shadow: var(--app-shadow);
+  box-sizing: border-box;
+  animation: content-enter var(--app-motion-normal) 90ms var(--app-ease-out) both;
+}
+
+.section-head,
+.sheet-head,
+.weight-input-row,
+.form-row,
+.inline-input,
+.record-item,
+.record-actions {
+  display: flex;
+  align-items: center;
+}
+
+.section-head {
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 720;
+}
+
+.section-count {
+  font-size: 22rpx;
 }
 
 .metric-switch,
 .range-switch,
 .unit-switch {
+  display: flex;
+  padding: 4rpx;
+  border-radius: 16rpx;
   background: var(--app-fill);
 }
 
 .metric-switch button,
 .range-switch button,
 .unit-switch button {
+  min-width: 92rpx;
+  height: 58rpx;
+  padding: 0 16rpx;
+  border-radius: 13rpx;
   color: var(--app-label-secondary);
   background: transparent;
+  font-size: 23rpx;
+  line-height: 58rpx;
+  transition:
+    color var(--app-motion-fast) ease-out,
+    background-color var(--app-motion-fast) ease-out;
 }
 
 .metric-switch button.active,
@@ -704,8 +865,31 @@ function getChinaDateTimeParts(date: Date) {
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
 }
 
+.metric-switch button.disabled {
+  opacity: 0.42;
+}
+
+.range-switch {
+  margin-top: 24rpx;
+}
+
+.range-switch button {
+  flex: 1;
+}
+
 .chart-box {
   height: 350rpx;
+  margin-top: 18rpx;
+}
+
+.chart-loading,
+.chart-empty,
+.empty-list {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260rpx;
+  font-size: 24rpx;
 }
 
 .history-section {
@@ -720,16 +904,17 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .record-list {
-  gap: 0;
   margin-top: 0;
 }
 
 .record-item {
+  gap: 18rpx;
   margin-left: 28rpx;
   padding: 22rpx 24rpx 22rpx 0;
   border-bottom: 1rpx solid var(--app-separator);
   border-radius: 0;
   background: transparent;
+  animation: item-enter 220ms var(--app-ease-out) both;
 }
 
 .record-item:last-child {
@@ -746,13 +931,61 @@ function getChinaDateTimeParts(date: Date) {
   color: var(--app-orange);
 }
 
+.record-data {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-weight,
+.record-date {
+  display: block;
+}
+
+.record-weight {
+  font-size: 28rpx;
+  font-weight: 650;
+}
+
+.record-date {
+  margin-top: 5rpx;
+  font-size: 21rpx;
+}
+
+.record-bmi {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3rpx;
+  font-size: 19rpx;
+}
+
+.record-bmi-value {
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.record-actions {
+  flex: 0 0 auto;
+  gap: 8rpx;
+}
+
 .record-actions button {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6rpx;
+  min-width: 74rpx;
+  height: 54rpx;
+  padding: 0 12rpx;
+  border-radius: 14rpx;
   color: var(--app-blue);
   background: var(--app-blue-soft);
+  font-size: 21rpx;
+  line-height: 54rpx;
+  transition:
+    transform var(--app-motion-fast) var(--app-ease-out),
+    opacity var(--app-motion-fast) ease-out;
 }
 
 .record-actions button.danger {
@@ -762,14 +995,27 @@ function getChinaDateTimeParts(date: Date) {
 
 .load-more,
 .retry-button {
+  min-height: 72rpx;
+  margin: 18rpx 24rpx;
+  border-radius: 18rpx;
   color: var(--app-blue);
   background: var(--app-blue-soft);
+  font-size: 24rpx;
+  line-height: 72rpx;
+}
+
+.list-end {
+  padding: 26rpx;
+  font-size: 22rpx;
+  text-align: center;
 }
 
 .state-panel {
+  padding: 48rpx 28rpx;
   margin-top: 80rpx;
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
+  text-align: center;
 }
 
 .state-panel text {
@@ -777,15 +1023,25 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
   background: var(--app-mask);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .sheet {
+  width: 100%;
   max-height: 88vh;
   padding: 14rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
   border-radius: 30rpx 30rpx 0 0;
   color: var(--app-label-primary);
   background: var(--app-surface-secondary);
+  box-sizing: border-box;
+  animation: sheet-enter var(--app-motion-normal) var(--app-ease-out) both;
 }
 
 .sheet-grabber {
@@ -797,6 +1053,7 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .sheet-head {
+  justify-content: space-between;
   min-height: 72rpx;
 }
 
@@ -831,17 +1088,28 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .weight-input-row {
+  align-items: baseline;
+  justify-content: center;
+  gap: 14rpx;
   margin: 30rpx 0 26rpx;
 }
 
 .weight-input {
+  width: 260rpx;
+  height: 104rpx;
+  border-bottom: 3rpx solid var(--app-blue);
   border-bottom-color: var(--app-blue);
   color: var(--app-label-primary);
+  font-size: 68rpx;
+  font-weight: 760;
   font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 .weight-input-row > text {
   color: var(--app-blue);
+  font-size: 28rpx;
+  font-weight: 650;
 }
 
 .form-group {
@@ -855,6 +1123,8 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .form-row {
+  justify-content: space-between;
+  gap: 24rpx;
   min-height: 102rpx;
   margin-left: 28rpx;
   padding-right: 28rpx;
@@ -866,15 +1136,82 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .form-label {
+  flex: 0 0 auto;
   color: var(--app-label-primary);
+  font-size: 27rpx;
+  font-weight: 520;
 }
 
 .picker-value,
 .inline-input input {
   color: var(--app-label-primary);
+  font-size: 27rpx;
+  text-align: right;
 }
 
 .inline-input {
+  justify-content: flex-end;
+  gap: 10rpx;
+  min-width: 240rpx;
   color: var(--app-label-secondary);
+  font-size: 23rpx;
+}
+
+.inline-input input {
+  width: 170rpx;
+}
+
+.unit-row {
+  align-items: center;
+}
+
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-enter {
+  from {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes success-pop {
+  0% {
+    transform: scale(0.985);
+  }
+
+  65% {
+    transform: scale(1.012);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 </style>

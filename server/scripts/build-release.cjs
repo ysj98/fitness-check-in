@@ -1,6 +1,8 @@
 const { execFileSync } = require('node:child_process')
+const { Buffer } = require('node:buffer')
 const fs = require('node:fs')
 const path = require('node:path')
+const process = require('node:process')
 
 const rootDir = path.resolve(__dirname, '..')
 const distDir = path.join(rootDir, 'dist')

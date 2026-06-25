@@ -28,11 +28,11 @@ onMounted(() => {
   <view class="ios-header" :style="{ paddingTop: `${topInset}px` }">
     <view class="capsule-space" :style="{ height: `${capsuleBarHeight}px` }" />
     <view class="title-block">
-      <text v-if="subtitle" class="header-subtitle">
-        {{ subtitle }}
-      </text>
       <text class="header-title">
         {{ title }}
+      </text>
+      <text v-if="subtitle" class="header-subtitle">
+        {{ subtitle }}
       </text>
     </view>
   </view>
@@ -46,7 +46,7 @@ onMounted(() => {
 }
 
 .title-block {
-  padding: 8rpx var(--app-gutter) 20rpx;
+  padding: 10rpx var(--app-gutter) 26rpx;
 }
 
 .header-subtitle,
@@ -55,15 +55,16 @@ onMounted(() => {
 }
 
 .header-subtitle {
-  margin-bottom: 6rpx;
+  margin-top: 8rpx;
   color: var(--app-label-secondary);
-  font-size: 24rpx;
+  font-size: 25rpx;
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .header-title {
-  font-size: 64rpx;
-  font-weight: 800;
-  line-height: 1.12;
+  font-size: 68rpx;
+  font-weight: 780;
+  line-height: 1.08;
 }
 </style>

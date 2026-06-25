@@ -1,175 +1,107 @@
 <script setup lang="ts">
-// i-carbon-code
-import { customTabbarEnable, needHideNativeTabbar, tabbarCacheEnable } from './config'
 import { tabbarList, tabbarStore } from './store'
 import TabbarItem from './TabbarItem.vue'
 import { useThemeStore } from '@/store/theme'
 
-// #ifdef MP-WEIXIN
-// 将自定义节点设置成虚拟的（去掉自定义组件包裹层），更加接近Vue组件的表现，能更好的使用flex属性
 defineOptions({
   virtualHost: true,
 })
 
 const themeStore = useThemeStore()
 
-// #endif
-
-/**
- * 中间的鼓包tabbarItem的点击事件
- */
-function handleClickBulge() {
-  uni.showToast({
-    title: '点击了中间的鼓包tabbarItem',
-    icon: 'none',
-  })
-}
-
 function handleClick(index: number) {
-  // 当前高亮和真实页面都已经是目标 tab 时，不重复跳转
-  if (index === tabbarStore.curIdx && tabbarStore.isCurrentRouteTabbarItem(index)) {
+  if (index === tabbarStore.curIdx.value && tabbarStore.isCurrentRouteTabbarItem(index)) {
     return
   }
-  const list = tabbarList.value
-  if (!list[index]) {
-    return
-  }
-  if (list[index].isBulge) {
-    handleClickBulge()
-    return
-  }
-  const url = list[index].pagePath
-  const prevIdx = tabbarStore.curIdx
-  tabbarStore.setCurIdx(index)
-  const syncTabbarAfterNavigation = () => {
-    tabbarStore.syncCurIdxByCurrentPageAsync()
-  }
-  const restoreTabbarWhenNavigationFailed = () => {
-    tabbarStore.setCurIdx(prevIdx)
-  }
-  if (tabbarCacheEnable) {
-    uni.switchTab({
-      url,
-      success: syncTabbarAfterNavigation,
-      fail: restoreTabbarWhenNavigationFailed,
-    })
-  }
-  else {
-    uni.navigateTo({
-      url,
-      success: syncTabbarAfterNavigation,
-      fail: restoreTabbarWhenNavigationFailed,
-    })
-  }
-}
-// #ifndef MP-WEIXIN || MP-ALIPAY
-// 因为有了 custom:true， 微信里面不需要多余的hide操作
-onLoad(() => {
-  // 解决原生 tabBar 未隐藏导致有2个 tabBar 的问题
-  needHideNativeTabbar
-  && uni.hideTabBar({
-    fail(err) {
-      console.log('hideTabBar fail: ', err)
-    },
-    success(res) {
-      // console.log('hideTabBar success: ', res)
-    },
-  })
-})
-// #endif
 
-// #ifdef MP-ALIPAY
-onMounted(() => {
-  // 解决支付宝自定义tabbar 未隐藏导致有2个 tabBar 的问题; 注意支付宝很特别，需要在 onMounted 钩子调用
-  customTabbarEnable // 另外，支付宝里面，只要是 customTabbar 都需要隐藏
-  && uni.hideTabBar({
-    fail(err) {
-      console.log('hideTabBar fail: ', err)
-    },
-    success(res) {
-      // console.log('hideTabBar success: ', res)
-    },
+  const item = tabbarList.value[index]
+  if (!item) {
+    return
+  }
+
+  const previousIndex = tabbarStore.curIdx.value
+  tabbarStore.setCurIdx(index)
+  uni.switchTab({
+    url: item.pagePath,
+    success: () => tabbarStore.syncCurIdxByCurrentPageAsync(),
+    fail: () => tabbarStore.setCurIdx(previousIndex),
   })
-})
-// #endif
-function getColorByIndex(index: number) {
-  const activeColor = themeStore.isDark ? '#30d158' : '#34c759'
-  const inactiveColor = themeStore.isDark ? 'rgba(235, 235, 245, 0.6)' : 'rgba(60, 60, 67, 0.62)'
-  return tabbarStore.curIdx === index ? activeColor : inactiveColor
+}
+
+function getColor(index: number) {
+  if (tabbarStore.curIdx.value === index) {
+    return themeStore.isDark ? '#30d158' : '#34c759'
+  }
+  return themeStore.isDark ? 'rgba(235, 235, 245, 0.6)' : 'rgba(60, 60, 67, 0.62)'
 }
 </script>
 
 <template>
-  <view v-if="customTabbarEnable" class="tabbar-shell h-58px pb-safe" :class="`theme-${themeStore.mode}`">
-    <view class="border-and-fixed" @touchmove.stop.prevent>
-      <view class="tabbar-content h-58px flex items-center">
+  <view class="tabbar-shell" :class="`theme-${themeStore.mode}`">
+    <view class="tabbar-fixed" @touchmove.stop.prevent>
+      <view class="tabbar-content">
         <view
-          v-for="(item, index) in tabbarList" :key="index"
-          class="flex flex-1 flex-col items-center justify-center"
-          :style="{ color: getColorByIndex(index) }"
+          v-for="(item, index) in tabbarList"
+          :key="item.pagePath"
+          class="tabbar-target"
+          :class="{ active: tabbarStore.curIdx.value === index }"
+          :style="{ color: getColor(index) }"
           @click="handleClick(index)"
         >
-          <view v-if="item.isBulge" class="relative">
-            <!-- 中间一个鼓包tabbarItem的处理 -->
-            <view class="bulge">
-              <TabbarItem :item="item" :index="index" class="text-center" is-bulge />
-            </view>
-          </view>
-          <TabbarItem v-else :item="item" :index="index" class="relative px-3 text-center" />
+          <TabbarItem :item="item" :active="tabbarStore.curIdx.value === index" />
         </view>
       </view>
-
-      <view class="pb-safe" />
+      <view class="safe-bottom" />
     </view>
   </view>
 </template>
 
 <style scoped lang="scss">
-.border-and-fixed {
+.tabbar-fixed {
   position: fixed;
+  right: 0;
   bottom: 0;
   left: 0;
-  right: 0;
   z-index: 1000;
-  border-top: 1rpx solid var(--app-separator);
-  background: rgba(249, 249, 249, 0.84);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1rpx solid rgba(60, 60, 67, 0.12);
+  background: rgba(250, 250, 252, 0.88);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.045);
   box-sizing: border-box;
 }
 
-.theme-dark .border-and-fixed {
-  background: rgba(28, 28, 30, 0.84);
+.theme-dark .tabbar-fixed {
+  border-top-color: rgba(255, 255, 255, 0.08);
+  background: rgba(24, 24, 26, 0.88);
+  box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.28);
 }
 
-.tabbar-content > view {
-  min-height: 88rpx;
+.tabbar-content {
+  display: flex;
+  align-items: center;
+  height: 112rpx;
+  padding: 4rpx 28rpx 0;
+  box-sizing: border-box;
+}
+
+.tabbar-target {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 96rpx;
   transition:
     color var(--app-motion-fast) ease-out,
     transform var(--app-motion-fast) ease-out;
 }
 
-.tabbar-content > view:active {
-  transform: scale(0.94);
+.tabbar-target:active {
+  transform: scale(0.95);
 }
-// 中间鼓包的样式
-.bulge {
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform-origin: top center;
-  transform: translateX(-50%) scale(0.5) translateY(-33%);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 250rpx;
-  height: 250rpx;
-  border-radius: 50%;
-  background-color: #fff;
-  box-shadow: inset 0 0 0 1px #fefefe;
 
-  &:active {
-    // opacity: 0.8;
-  }
+.safe-bottom {
+  height: env(safe-area-inset-bottom);
 }
 </style>

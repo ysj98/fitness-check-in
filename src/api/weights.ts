@@ -67,7 +67,7 @@ export function createWeight(payload: WeightRecordPayload) {
 export function updateWeight(id: number, payload: WeightRecordPayload) {
   return http<WeightRecord>({
     url: `/api/weights/${id}`,
-    method: 'PATCH' as UniApp.RequestOptions['method'],
+    method: 'PATCH',
     data: payload,
   })
 }
@@ -79,7 +79,7 @@ export function deleteWeight(id: number) {
 export function updateWeightSettings(payload: WeightSettingsPayload) {
   return http<IUserInfoRes>({
     url: '/api/user/weight-settings',
-    method: 'PATCH' as UniApp.RequestOptions['method'],
+    method: 'PATCH',
     data: payload,
   })
 }

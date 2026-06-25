@@ -1,27 +1,16 @@
-// 测试用的 iconfont，可生效
-// @import './iconfont.css';
-
-.test {
-  // 可以通过 @apply 多个样式封装整体样式
-  @apply mt-4 ml-4;
-
-  padding-top: 4px;
-  color: red;
-}
-
 :root,
 page {
-  --app-bg: #f2f2f7;
+  --app-bg: #f5f5f7;
   --app-surface: #ffffff;
-  --app-surface-secondary: #f2f2f7;
-  --app-surface-tertiary: #e5e5ea;
-  --app-label-primary: #000000;
-  --app-label-secondary: rgba(60, 60, 67, 0.72);
-  --app-label-tertiary: rgba(60, 60, 67, 0.44);
-  --app-separator: rgba(60, 60, 67, 0.18);
-  --app-fill: rgba(120, 120, 128, 0.12);
-  --app-fill-strong: rgba(120, 120, 128, 0.2);
-  --app-mask: rgba(0, 0, 0, 0.42);
+  --app-surface-secondary: #f0f0f3;
+  --app-surface-tertiary: #e8e8ed;
+  --app-label-primary: #141416;
+  --app-label-secondary: rgba(60, 60, 67, 0.76);
+  --app-label-tertiary: rgba(60, 60, 67, 0.48);
+  --app-separator: rgba(60, 60, 67, 0.14);
+  --app-fill: rgba(120, 120, 128, 0.1);
+  --app-fill-strong: rgba(120, 120, 128, 0.18);
+  --app-mask: rgba(0, 0, 0, 0.46);
   --app-green: #34c759;
   --app-green-soft: rgba(52, 199, 89, 0.14);
   --app-blue: #007aff;
@@ -31,14 +20,15 @@ page {
   --app-pink: #ff2d55;
   --app-pink-soft: rgba(255, 45, 85, 0.13);
   --app-red: #ff3b30;
-  --app-card-radius: 24rpx;
-  --app-control-radius: 18rpx;
+  --app-purple: #af52de;
+  --app-purple-soft: rgba(175, 82, 222, 0.14);
+  --app-card-radius: 30rpx;
+  --app-control-radius: 22rpx;
   --app-gutter: 32rpx;
-  --app-shadow: 0 2rpx 14rpx rgba(0, 0, 0, 0.05);
+  --app-shadow: 0 1rpx 0 rgba(0, 0, 0, 0.03), 0 12rpx 34rpx rgba(0, 0, 0, 0.055);
   --app-motion-fast: 160ms;
   --app-motion-normal: 240ms;
-  --wot-color-theme: var(--app-green);
-
+  --app-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
   background: var(--app-bg);
 }
@@ -64,12 +54,18 @@ page {
   --app-pink: #ff375f;
   --app-pink-soft: rgba(255, 55, 95, 0.2);
   --app-red: #ff453a;
-  --app-shadow: none;
+  --app-purple: #bf5af2;
+  --app-purple-soft: rgba(191, 90, 242, 0.2);
+  --app-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.035), 0 16rpx 34rpx rgba(0, 0, 0, 0.24);
 }
 
 button,
 input {
   font-family: inherit;
+}
+
+button::after {
+  border: 0;
 }
 
 .app-page {
@@ -81,18 +77,24 @@ input {
 }
 
 .ios-card {
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
   box-shadow: var(--app-shadow);
+  box-sizing: border-box;
+}
+
+.theme-dark .ios-card {
+  border-color: rgba(255, 255, 255, 0.055);
 }
 
 .ios-section-title {
   display: block;
-  margin: 38rpx 12rpx 14rpx;
+  margin: 44rpx 12rpx 16rpx;
   color: var(--app-label-secondary);
-  font-size: 24rpx;
-  font-weight: 600;
-  text-transform: uppercase;
+  font-size: 25rpx;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .ios-pressed {
@@ -105,27 +107,8 @@ input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-shell,
-  .app-shell * {
-    animation-duration: 1ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 1ms !important;
+  .app-shell {
+    --app-motion-fast: 1ms;
+    --app-motion-normal: 1ms;
   }
 }
-
-/*
-border-t-1
-由于uniapp中无法使用*选择器，使用魔法代替*，加上此规则可以简化border与divide的使用，并提升布局的兼容性
-1. 防止padding和border影响元素宽度。 (https://github.com/mozdevs/cssremedy/issues/4)
-2. 允许仅通过添加边框宽度来向元素添加边框。 (https://github.com/tailwindcss/tailwindcss/pull/116)
-3. [UnoCSS]: 允许使用css变量'--un-default-border-color'覆盖默认边框颜色
-*/
-// 这个样式有重大BUG，先去掉！！(2025-08-15)
-// :not(not),
-// ::before,
-// ::after {
-//   box-sizing: border-box; /* 1 */
-//   border-width: 0; /* 2 */
-//   border-style: solid; /* 2 */
-//   border-color: var(--un-default-border-color, #e5e7eb); /* 3 */
-// }

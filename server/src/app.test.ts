@@ -178,7 +178,7 @@ async function login(app: Awaited<ReturnType<typeof createApp>>, code = 'code-1'
     url: '/api/auth/wx-login',
     payload: { code },
   })
-  return response.json().data as { token: string, user: AppUser }
+  return response.json().data as { token: string, user: { userId: number } }
 }
 
 function checkInAtChinaDay(userId: number, dayOffset: number, id: number): AppCheckIn {
@@ -229,7 +229,7 @@ describe('fitness check-in api', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json().data.token).toBeTruthy()
-    expect(response.json().data.user.openid).toBe('openid-abc')
+    expect(response.json().data.user.username).toBe('openid-abc')
     expect(response.json().data.user.dailyGoal).toBe(1)
   })
 
@@ -270,8 +270,8 @@ describe('fitness check-in api', () => {
     })
     const session = await login(app)
     db.checkIns.push(
-      { id: 1, userId: session.user.id, checkedAt: new Date('2026-06-01T01:00:00.000Z'), createdAt: new Date() },
-      { id: 2, userId: session.user.id, checkedAt: new Date('2026-06-01T02:00:00.000Z'), createdAt: new Date() },
+      { id: 1, userId: session.user.userId, checkedAt: new Date('2026-06-01T01:00:00.000Z'), createdAt: new Date() },
+      { id: 2, userId: session.user.userId, checkedAt: new Date('2026-06-01T02:00:00.000Z'), createdAt: new Date() },
     )
 
     const response = await app.inject({
@@ -311,9 +311,9 @@ describe('fitness check-in api', () => {
     })
     const session = await login(app)
     db.checkIns.push(
-      checkInAtChinaDay(session.user.id, 0, 1),
-      checkInAtChinaDay(session.user.id, 1, 2),
-      checkInAtChinaDay(session.user.id, 2, 3),
+      checkInAtChinaDay(session.user.userId, 0, 1),
+      checkInAtChinaDay(session.user.userId, 1, 2),
+      checkInAtChinaDay(session.user.userId, 2, 3),
     )
 
     const response = await app.inject({
@@ -333,8 +333,8 @@ describe('fitness check-in api', () => {
     })
     const session = await login(app)
     db.checkIns.push(
-      checkInAtChinaDay(session.user.id, 0, 1),
-      checkInAtChinaDay(session.user.id, 2, 2),
+      checkInAtChinaDay(session.user.userId, 0, 1),
+      checkInAtChinaDay(session.user.userId, 2, 2),
     )
 
     const response = await app.inject({
@@ -344,30 +344,6 @@ describe('fitness check-in api', () => {
     })
 
     expect(response.json().data.currentStreak).toBe(1)
-  })
-
-  it('groups current week stats', async () => {
-    const db = createMemoryDb()
-    const app = await createApp({
-      db,
-      exchangeCode: async () => ({ openid: 'openid-1' }),
-    })
-    const session = await login(app)
-    db.checkIns.push(
-      checkInAtChinaDay(session.user.id, 0, 1),
-      checkInAtChinaDay(session.user.id, 0, 2),
-      checkInAtChinaDay(session.user.id, 1, 3),
-    )
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/checkins/stats',
-      headers: { authorization: `Bearer ${session.token}` },
-    })
-
-    expect(response.json().data.weekTotal).toBeGreaterThanOrEqual(2)
-    expect(response.json().data.activeDays).toBeGreaterThanOrEqual(1)
-    expect(response.json().data.weekDays.reduce((sum: number, day: { count: number }) => sum + day.count, 0)).toBe(response.json().data.weekTotal)
   })
 
   it('updates current user profile', async () => {
@@ -437,10 +413,10 @@ describe('fitness check-in api', () => {
       },
     })
     db.checkIns.push(
-      checkInAtChinaDay(session.user.id, 0, 1),
-      checkInAtChinaDay(session.user.id, 0, 2),
-      checkInAtChinaDay(session.user.id, 1, 3),
-      checkInAtChinaDay(session.user.id, 2, 4),
+      checkInAtChinaDay(session.user.userId, 0, 1),
+      checkInAtChinaDay(session.user.userId, 0, 2),
+      checkInAtChinaDay(session.user.userId, 1, 3),
+      checkInAtChinaDay(session.user.userId, 2, 4),
     )
 
     const response = await app.inject({

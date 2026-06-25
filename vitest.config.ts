@@ -15,7 +15,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(process.cwd(), 'src'),
-      '@img': path.resolve(process.cwd(), 'src/static/images'),
     },
   },
 })
