@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify'
-import type { AppDb, WxSession } from './types.js'
+import type { AppCheckIn, AppDb, WxSession } from './types.js'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -197,6 +197,260 @@ function buildBadges(params: { currentStreak: number, totalCount: number, todayC
   ]
 }
 
+function calculateCurrentStreak(records: AppCheckIn[]) {
+  const checkedDateSet = new Set(records.map(record => formatChinaDate(record.checkedAt)))
+  let currentStreak = 0
+  let cursor = getChinaDayRange().start
+
+  while (checkedDateSet.has(formatChinaDate(cursor))) {
+    currentStreak += 1
+    cursor = addChinaDays(cursor, -1)
+  }
+
+  return currentStreak
+}
+
+function calculateGoalStreak(records: AppCheckIn[], dailyGoal: number) {
+  const dailyCounts = records.reduce<Record<string, number>>((result, record) => {
+    const key = formatChinaDate(record.checkedAt)
+    result[key] = (result[key] || 0) + 1
+    return result
+  }, {})
+  let streak = 0
+  let cursor = getChinaDayRange().start
+
+  while ((dailyCounts[formatChinaDate(cursor)] || 0) >= dailyGoal) {
+    streak += 1
+    cursor = addChinaDays(cursor, -1)
+  }
+
+  return streak
+}
+
+function clampProgress(current: number, target: number) {
+  return {
+    current,
+    target,
+    percent: target <= 0 ? 100 : Math.min(100, Math.round((current / target) * 100)),
+  }
+}
+
+function buildAchievement(params: {
+  key: string
+  name: string
+  description: string
+  category: 'checkin' | 'streak' | 'weight' | 'profile'
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum'
+  icon: 'checkin' | 'streak' | 'target' | 'weight' | 'profile' | 'badge'
+  accent: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
+  current: number
+  target: number
+}) {
+  const progress = clampProgress(params.current, params.target)
+  return {
+    key: params.key,
+    name: params.name,
+    description: params.description,
+    category: params.category,
+    tier: params.tier,
+    icon: params.icon,
+    accent: params.accent,
+    unlocked: progress.percent >= 100,
+    progress,
+  }
+}
+
+function buildAchievements(params: {
+  user: NonNullable<Awaited<ReturnType<AppDb['user']['findUnique']>>>
+  checkIns: AppCheckIn[]
+  weightCount: number
+}) {
+  const { user, checkIns, weightCount } = params
+  const totalCount = checkIns.length
+  const currentStreak = calculateCurrentStreak(checkIns)
+  const dailyGoal = user.dailyGoal || 1
+  const todayRange = getChinaDayRange()
+  const todayCount = checkIns.filter(record => record.checkedAt >= todayRange.start && record.checkedAt < todayRange.end).length
+  const goalStreak = calculateGoalStreak(checkIns, dailyGoal)
+  const profileFields = [
+    user.nickname,
+    user.avatarUrl,
+    user.gender,
+    user.birthday,
+    toNumber(user.heightCm),
+  ]
+  const profileCompleted = profileFields.filter(Boolean).length
+  const hasTargetWeight = toNumber(user.targetWeightKg) !== null ? 1 : 0
+
+  return [
+    buildAchievement({
+      key: 'checkin_first',
+      name: '初次点亮',
+      description: '完成第一次运动打卡',
+      category: 'checkin',
+      tier: 'bronze',
+      icon: 'checkin',
+      accent: 'green',
+      current: totalCount,
+      target: 1,
+    }),
+    buildAchievement({
+      key: 'checkin_10',
+      name: '稳定起步',
+      description: '累计完成 10 次打卡',
+      category: 'checkin',
+      tier: 'silver',
+      icon: 'checkin',
+      accent: 'green',
+      current: totalCount,
+      target: 10,
+    }),
+    buildAchievement({
+      key: 'checkin_30',
+      name: '习惯养成',
+      description: '累计完成 30 次打卡',
+      category: 'checkin',
+      tier: 'gold',
+      icon: 'checkin',
+      accent: 'gold',
+      current: totalCount,
+      target: 30,
+    }),
+    buildAchievement({
+      key: 'checkin_100',
+      name: '百次坚持',
+      description: '累计完成 100 次打卡',
+      category: 'checkin',
+      tier: 'platinum',
+      icon: 'badge',
+      accent: 'gold',
+      current: totalCount,
+      target: 100,
+    }),
+    buildAchievement({
+      key: 'streak_3',
+      name: '连续 3 天',
+      description: '连续 3 天保持运动',
+      category: 'streak',
+      tier: 'bronze',
+      icon: 'streak',
+      accent: 'orange',
+      current: currentStreak,
+      target: 3,
+    }),
+    buildAchievement({
+      key: 'streak_7',
+      name: '一周不断',
+      description: '连续 7 天保持运动',
+      category: 'streak',
+      tier: 'silver',
+      icon: 'streak',
+      accent: 'orange',
+      current: currentStreak,
+      target: 7,
+    }),
+    buildAchievement({
+      key: 'streak_14',
+      name: '双周节奏',
+      description: '连续 14 天保持运动',
+      category: 'streak',
+      tier: 'gold',
+      icon: 'streak',
+      accent: 'gold',
+      current: currentStreak,
+      target: 14,
+    }),
+    buildAchievement({
+      key: 'streak_30',
+      name: '月度长燃',
+      description: '连续 30 天保持运动',
+      category: 'streak',
+      tier: 'platinum',
+      icon: 'streak',
+      accent: 'gold',
+      current: currentStreak,
+      target: 30,
+    }),
+    buildAchievement({
+      key: 'goal_today',
+      name: '今日达标',
+      description: '完成今天的打卡目标',
+      category: 'streak',
+      tier: 'bronze',
+      icon: 'target',
+      accent: 'blue',
+      current: todayCount,
+      target: dailyGoal,
+    }),
+    buildAchievement({
+      key: 'goal_streak_3',
+      name: '目标连击',
+      description: '连续 3 天完成每日目标',
+      category: 'streak',
+      tier: 'silver',
+      icon: 'target',
+      accent: 'blue',
+      current: goalStreak,
+      target: 3,
+    }),
+    buildAchievement({
+      key: 'weight_first',
+      name: '体重起点',
+      description: '记录第一次体重',
+      category: 'weight',
+      tier: 'bronze',
+      icon: 'weight',
+      accent: 'blue',
+      current: weightCount,
+      target: 1,
+    }),
+    buildAchievement({
+      key: 'weight_7',
+      name: '趋势观察',
+      description: '累计记录 7 次体重',
+      category: 'weight',
+      tier: 'silver',
+      icon: 'weight',
+      accent: 'blue',
+      current: weightCount,
+      target: 7,
+    }),
+    buildAchievement({
+      key: 'weight_30',
+      name: '身体档案',
+      description: '累计记录 30 次体重',
+      category: 'weight',
+      tier: 'gold',
+      icon: 'weight',
+      accent: 'gold',
+      current: weightCount,
+      target: 30,
+    }),
+    buildAchievement({
+      key: 'weight_target',
+      name: '目标设定',
+      description: '设置目标体重',
+      category: 'weight',
+      tier: 'bronze',
+      icon: 'target',
+      accent: 'pink',
+      current: hasTargetWeight,
+      target: 1,
+    }),
+    buildAchievement({
+      key: 'profile_complete',
+      name: '资料完整',
+      description: '完善昵称、头像、性别、生日和身高',
+      category: 'profile',
+      tier: 'gold',
+      icon: 'profile',
+      accent: 'pink',
+      current: profileCompleted,
+      target: profileFields.length,
+    }),
+  ]
+}
+
 function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
   if (!user) {
     return null
@@ -344,6 +598,14 @@ export async function createApp(options: CreateAppOptions) {
   app.addContentTypeParser(/^multipart\/form-data/i, { parseAs: 'buffer' }, (request, body, done) => {
     done(null, parseAvatarUpload(body as Buffer, request.headers['content-type']))
   })
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
+    try {
+      done(null, body === '' ? {} : JSON.parse(body as string))
+    }
+    catch (error) {
+      done(error as Error)
+    }
+  })
 
   app.decorate('db', options.db)
 
@@ -454,9 +716,31 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.addHook('preHandler', async (request) => {
-    if (request.routeOptions.url?.startsWith('/api/checkins') || request.routeOptions.url?.startsWith('/api/weights')) {
+    if (
+      request.routeOptions.url?.startsWith('/api/checkins')
+      || request.routeOptions.url?.startsWith('/api/weights')
+      || request.routeOptions.url?.startsWith('/api/achievements')
+    ) {
       await requireAuth(request)
     }
+  })
+
+  app.get('/api/achievements', async (request) => {
+    const [user, checkIns, weightCount] = await Promise.all([
+      app.db.user.findUnique({ where: { id: request.user.userId } }),
+      app.db.checkIn.findMany({
+        where: { userId: request.user.userId },
+        orderBy: { checkedAt: 'desc' },
+      }),
+      app.db.weightRecord.count({ where: { userId: request.user.userId } }),
+    ])
+    if (!user) {
+      const error = new Error('User not found') as Error & { statusCode: number }
+      error.statusCode = 401
+      throw error
+    }
+
+    return ok(buildAchievements({ user, checkIns, weightCount }))
   })
 
   app.get('/api/weights', async (request) => {
@@ -687,14 +971,7 @@ export async function createApp(options: CreateAppOptions) {
       error.statusCode = 401
       throw error
     }
-    const checkedDateSet = new Set(allRecords.map(record => formatChinaDate(record.checkedAt)))
-    let currentStreak = 0
-    let cursor = getChinaDayRange().start
-
-    while (checkedDateSet.has(formatChinaDate(cursor))) {
-      currentStreak += 1
-      cursor = addChinaDays(cursor, -1)
-    }
+    const currentStreak = calculateCurrentStreak(allRecords)
     const totalCount = allRecords.length
     const todayGoal = user.dailyGoal || 1
     const todayCompleted = todayCount >= todayGoal

@@ -262,6 +262,28 @@ describe('fitness check-in api', () => {
     expect(response.json().data.records).toHaveLength(2)
   })
 
+  it('accepts check-in creation with an empty json body', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/checkins',
+      headers: {
+        'authorization': `Bearer ${session.token}`,
+        'content-type': 'application/json',
+      },
+      payload: '',
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().data.id).toBe(1)
+  })
+
   it('groups month check-ins by China date', async () => {
     const db = createMemoryDb()
     const app = await createApp({
@@ -763,5 +785,152 @@ describe('fitness check-in api', () => {
     })
     expect(statsResponse.json().data.bmi).toBe(22.2)
     expect(statsResponse.json().data.trend[0].bmi).toBe(22.2)
+  })
+
+  it('requires login for achievements', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/achievements',
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('returns empty achievement progress for a new user', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/achievements',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+    const achievements = response.json().data
+
+    expect(achievements.find((item: { key: string }) => item.key === 'checkin_first').progress).toEqual({
+      current: 0,
+      target: 1,
+      percent: 0,
+    })
+    expect(achievements.find((item: { key: string }) => item.key === 'profile_complete').unlocked).toBe(false)
+  })
+
+  it('returns check-in and streak achievement progress', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    db.checkIns.push(
+      checkInAtChinaDay(session.user.userId, 0, 1),
+      checkInAtChinaDay(session.user.userId, 0, 2),
+      checkInAtChinaDay(session.user.userId, 1, 3),
+      checkInAtChinaDay(session.user.userId, 1, 4),
+      checkInAtChinaDay(session.user.userId, 2, 5),
+    )
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: { authorization: `Bearer ${session.token}` },
+      payload: { nickname: 'Alex', dailyGoal: 2 },
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/achievements',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+    const achievements = response.json().data
+
+    expect(achievements.find((item: { key: string }) => item.key === 'checkin_first').unlocked).toBe(true)
+    expect(achievements.find((item: { key: string }) => item.key === 'streak_3').unlocked).toBe(true)
+    expect(achievements.find((item: { key: string }) => item.key === 'goal_streak_3').progress).toEqual({
+      current: 2,
+      target: 3,
+      percent: 67,
+    })
+  })
+
+  it('returns weight achievement progress', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    const authorization = { authorization: `Bearer ${session.token}` }
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/weight-settings',
+      headers: authorization,
+      payload: { targetWeightKg: 65 },
+    })
+    for (let index = 0; index < 7; index += 1) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/weights',
+        headers: authorization,
+        payload: {
+          weightKg: 70 - index * 0.1,
+          measuredAt: new Date(Date.now() - (index + 1) * 60 * 1000).toISOString(),
+        },
+      })
+    }
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/achievements',
+      headers: authorization,
+    })
+    const achievements = response.json().data
+
+    expect(achievements.find((item: { key: string }) => item.key === 'weight_first').unlocked).toBe(true)
+    expect(achievements.find((item: { key: string }) => item.key === 'weight_7').unlocked).toBe(true)
+    expect(achievements.find((item: { key: string }) => item.key === 'weight_target').unlocked).toBe(true)
+  })
+
+  it('unlocks profile achievement when core fields are complete', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: { authorization: `Bearer ${session.token}` },
+      payload: {
+        nickname: 'Alex',
+        avatarUrl: 'https://example.com/avatar.png',
+        gender: 'other',
+        birthday: '1995-05-20',
+        dailyGoal: 1,
+        heightCm: 178,
+      },
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/achievements',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+    const profileAchievement = response.json().data.find((item: { key: string }) => item.key === 'profile_complete')
+
+    expect(profileAchievement.unlocked).toBe(true)
+    expect(profileAchievement.progress.percent).toBe(100)
   })
 })

@@ -30,9 +30,9 @@ function handleClick(index: number) {
 
 function getColor(index: number) {
   if (tabbarStore.curIdx.value === index) {
-    return themeStore.isDark ? '#30d158' : '#34c759'
+    return themeStore.isDark ? '#34d982' : '#20c46b'
   }
-  return themeStore.isDark ? 'rgba(235, 235, 245, 0.6)' : 'rgba(60, 60, 67, 0.62)'
+  return themeStore.isDark ? 'rgba(230, 247, 238, 0.6)' : 'rgba(18, 32, 26, 0.62)'
 }
 </script>
 
@@ -62,26 +62,25 @@ function getColor(index: number) {
   right: 0;
   bottom: 0;
   left: 0;
-  z-index: 1000;
-  border-top: 1rpx solid rgba(60, 60, 67, 0.12);
-  background: rgba(250, 250, 252, 0.88);
+  z-index: 20000;
+  border-top: 1rpx solid var(--app-separator);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: saturate(180%) blur(24px);
   -webkit-backdrop-filter: saturate(180%) blur(24px);
-  box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.045);
+  box-shadow: 0 -14rpx 42rpx rgba(31, 88, 58, 0.1);
   box-sizing: border-box;
 }
 
 .theme-dark .tabbar-fixed {
-  border-top-color: rgba(255, 255, 255, 0.08);
-  background: rgba(24, 24, 26, 0.88);
+  background: rgba(13, 27, 22, 0.86);
   box-shadow: 0 -10rpx 34rpx rgba(0, 0, 0, 0.28);
 }
 
 .tabbar-content {
   display: flex;
   align-items: center;
-  height: 112rpx;
-  padding: 4rpx 28rpx 0;
+  height: 116rpx;
+  padding: 6rpx 28rpx 0;
   box-sizing: border-box;
 }
 

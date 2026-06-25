@@ -52,7 +52,6 @@ const todayLabel = computed(() => {
 })
 
 const monthKey = computed(() => getMonthKey(selectedMonth.value))
-
 const monthTitle = computed(() => {
   const [year, month] = monthStats.value.month.split('-')
   return `${year}年${Number(month)}月`
@@ -88,14 +87,10 @@ const goalPercent = computed(() => {
 
 const goalText = computed(() => {
   if (checkInStats.value.todayCompleted) {
-    return '今日目标已完成'
+    return '今日目标已达成'
   }
-  return `还差 ${Math.max((checkInStats.value.todayGoal || 1) - todayCount.value, 0)} 次达成`
+  return `还差 ${Math.max((checkInStats.value.todayGoal || 1) - todayCount.value, 0)} 次达标`
 })
-
-const goalRingStyle = computed(() => ({
-  background: `conic-gradient(var(--app-green) ${goalPercent.value}%, var(--app-fill) ${goalPercent.value}% 100%)`,
-}))
 
 onLoad(() => {
   initPage()
@@ -195,7 +190,7 @@ async function handleCheckIn() {
     checking.value = false
     setTimeout(() => {
       successPulse.value = false
-    }, 360)
+    }, 420)
   }
 }
 
@@ -242,55 +237,54 @@ function formatRecordDate(value: string) {
 
 <template>
   <view class="app-page checkin-page" :class="{ ready: pageReady }">
-    <ios-page-header title="运动" :subtitle="todayLabel" />
+    <ios-page-header title="运动" :subtitle="todayLabel" accent="green" />
 
-    <view class="activity-card ios-card" :class="{ pulse: successPulse }">
-      <view class="activity-head">
+    <app-card class="energy-card" accent="green" elevated :class="{ pulse: successPulse }">
+      <view class="hero-top">
         <view>
-          <text class="activity-label">连续打卡</text>
+          <text class="eyebrow">今日能量</text>
           <view class="streak-value numeric">
             <text>{{ checkInStats.currentStreak }}</text>
-            <text class="streak-unit">天</text>
+            <text class="streak-unit">天连续</text>
           </view>
         </view>
-        <view class="goal-copy">
+        <progress-ring :percent="goalPercent" label="目标" accent="green" />
+      </view>
+
+      <view class="goal-panel">
+        <view>
           <text class="goal-caption">今日目标</text>
-          <text class="goal-fraction numeric">{{ todayCount }}/{{ checkInStats.todayGoal || 1 }}</text>
           <text class="goal-status">{{ goalText }}</text>
         </view>
+        <text class="goal-fraction numeric">{{ todayCount }}/{{ checkInStats.todayGoal || 1 }}</text>
       </view>
 
-      <view class="action-area">
-        <view class="goal-ring" :style="goalRingStyle">
-          <view class="goal-ring-inner">
-            <text class="ring-percent numeric">{{ goalPercent }}%</text>
-            <text class="ring-label">完成度</text>
-          </view>
-        </view>
-        <view class="checkin-action">
-          <button
-            class="checkin-button"
-            :class="{ checking, success: successPulse }"
-            :disabled="checking || loading"
-            hover-class="checkin-button-pressed"
-            @click="handleCheckIn"
-          >
+      <view class="checkin-action">
+        <button
+          class="checkin-button"
+          :class="{ checking, success: successPulse }"
+          :disabled="checking || loading"
+          hover-class="checkin-button-pressed"
+          @click="handleCheckIn"
+        >
+          <view class="button-copy">
             <text class="button-main">{{ checking ? '记录中' : '立即打卡' }}</text>
             <text class="button-sub">今日第 {{ todayCount + 1 }} 次</text>
-          </button>
-          <view v-if="successPulse" class="success-ring" />
-        </view>
+          </view>
+        </button>
+        <view v-if="successPulse" class="success-ring" />
       </view>
-    </view>
+    </app-card>
 
-    <text class="ios-section-title">月度记录</text>
-    <view class="calendar-card ios-card">
+    <text class="ios-section-title">月度热力</text>
+    <app-card class="calendar-card" accent="blue">
       <view class="calendar-head">
         <button class="icon-button" aria-label="上个月" hover-class="icon-button-pressed" @click="changeMonth(-1)">
           <text class="i-carbon-chevron-left" />
         </button>
         <view class="month-title-wrap" @click="backToCurrentMonth">
           <text class="month-title">{{ monthTitle }}</text>
+          <text class="month-subtitle">点按回到本月</text>
         </view>
         <button class="icon-button" aria-label="下个月" hover-class="icon-button-pressed" @click="changeMonth(1)">
           <text class="i-carbon-chevron-right" />
@@ -305,7 +299,7 @@ function formatRecordDate(value: string) {
           v-for="day in calendarDays"
           :key="day.key"
           class="calendar-day"
-          :class="{ active: day.count > 0, today: day.isToday }"
+          :class="{ active: day.count > 0, today: day.isToday, hot: day.count >= 2 }"
         >
           <text>{{ day.day }}</text>
           <view v-if="day.count > 0" class="day-count numeric">
@@ -313,12 +307,13 @@ function formatRecordDate(value: string) {
           </view>
         </view>
       </view>
-    </view>
+    </app-card>
 
     <text class="ios-section-title">今日记录</text>
-    <view class="record-group ios-card">
+    <app-card class="record-group" accent="green">
       <view v-if="todayRecords.length === 0" class="empty-state">
-        暂无记录
+        <app-icon name="target" accent="green" size="md" />
+        <text>还没有记录，点亮今天的第一格。</text>
       </view>
       <view
         v-for="(record, index) in todayRecords"
@@ -327,9 +322,7 @@ function formatRecordDate(value: string) {
         class="record-row"
         :style="{ animationDelay: `${index * 35}ms` }"
       >
-        <view class="record-icon green-icon">
-          <text class="i-carbon-checkmark" />
-        </view>
+        <app-icon name="checkin" accent="green" size="sm" active />
         <view class="record-main">
           <text class="record-title">运动打卡</text>
           <text class="record-detail">{{ formatTime(record.checkedAt) }}</text>
@@ -338,12 +331,13 @@ function formatRecordDate(value: string) {
           删除
         </button>
       </view>
-    </view>
+    </app-card>
 
     <text class="ios-section-title">最近记录</text>
-    <view class="record-group ios-card">
+    <app-card class="record-group" accent="orange">
       <view v-if="recentRecords.length === 0" class="empty-state">
-        暂无记录
+        <app-icon name="streak" accent="orange" size="md" />
+        <text>持续运动后，时间线会在这里生长。</text>
       </view>
       <view v-for="record in recentRecords" v-else :key="record.id" class="recent-row">
         <view class="timeline-marker">
@@ -355,7 +349,7 @@ function formatRecordDate(value: string) {
         </view>
         <text class="recent-time numeric">{{ formatTime(record.checkedAt) }}</text>
       </view>
-    </view>
+    </app-card>
   </view>
 </template>
 
@@ -365,183 +359,130 @@ function formatRecordDate(value: string) {
   padding-left: 0;
 }
 
-.activity-card,
+.energy-card,
 .calendar-card,
 .record-group {
   margin-right: var(--app-gutter);
   margin-left: var(--app-gutter);
   opacity: 0;
-  transform: translateY(16rpx);
+  transform: translateY(18rpx);
 }
 
-.ready .activity-card {
-  animation: content-enter var(--app-motion-normal) ease-out both;
+.ready .energy-card {
+  animation: app-enter var(--app-motion-normal) var(--app-ease-out) both;
 }
 
 .ready .calendar-card {
-  animation: content-enter var(--app-motion-normal) 50ms ease-out both;
+  animation: app-enter var(--app-motion-normal) 70ms var(--app-ease-out) both;
 }
 
 .ready .record-group {
-  animation: content-enter var(--app-motion-normal) 90ms ease-out both;
+  animation: app-enter var(--app-motion-normal) 120ms var(--app-ease-out) both;
 }
 
-.activity-card {
-  position: relative;
+.energy-card {
   padding: 30rpx;
-  border-color: rgba(52, 199, 89, 0.18);
-  overflow: hidden;
 }
 
-.activity-card::before {
-  position: absolute;
-  top: 0;
-  right: 30rpx;
-  left: 30rpx;
-  height: 5rpx;
-  border-radius: 0 0 999rpx 999rpx;
-  background: var(--app-green);
-  content: '';
+.energy-card.pulse {
+  animation: success-pop 320ms var(--app-ease-spring) both;
 }
 
-.activity-card.pulse {
-  animation: success-pop 280ms ease-out both;
-}
-
-.activity-head,
-.action-area,
+.hero-top,
+.goal-panel,
 .calendar-head,
 .record-row,
-.recent-row {
+.recent-row,
+.checkin-button {
   display: flex;
   align-items: center;
 }
 
-.activity-head {
+.hero-top {
   justify-content: space-between;
   gap: 28rpx;
-  padding-top: 6rpx;
 }
 
-.activity-label,
+.eyebrow,
 .goal-caption,
 .goal-status,
-.ring-label,
 .record-detail,
-.recent-time {
+.recent-time,
+.recent-event,
+.month-subtitle {
   color: var(--app-label-secondary);
 }
 
-.activity-label,
+.eyebrow,
 .goal-caption {
   display: block;
   font-size: 24rpx;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .streak-value {
   display: flex;
   align-items: baseline;
-  gap: 8rpx;
-  margin-top: 4rpx;
+  gap: 10rpx;
+  margin-top: 8rpx;
   color: var(--app-green);
-  font-size: 64rpx;
-  font-weight: 800;
-  line-height: 1.1;
+  font-size: 76rpx;
+  font-weight: 860;
+  line-height: 1.05;
 }
 
 .streak-unit {
-  font-size: 26rpx;
-  font-weight: 600;
+  font-size: 25rpx;
+  font-weight: 720;
 }
 
-.goal-copy {
-  min-width: 190rpx;
-  padding: 14rpx 18rpx;
-  border-radius: 20rpx;
+.goal-panel {
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 28rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 22rpx;
   background: var(--app-fill);
-  text-align: right;
 }
 
-.goal-fraction,
-.goal-status {
+.goal-status,
+.goal-fraction {
   display: block;
 }
 
-.goal-fraction {
-  margin-top: 5rpx;
-  font-size: 36rpx;
-  font-weight: 750;
-}
-
 .goal-status {
-  margin-top: 3rpx;
-  font-size: 22rpx;
+  margin-top: 4rpx;
+  font-size: 23rpx;
 }
 
-.action-area {
-  justify-content: space-between;
-  gap: 34rpx;
-  margin-top: 32rpx;
-  padding-top: 28rpx;
-  border-top: 1rpx solid var(--app-separator);
-}
-
-.goal-ring {
-  flex: 0 0 auto;
-  width: 176rpx;
-  height: 176rpx;
-  padding: 14rpx;
-  border-radius: 50%;
-  box-sizing: border-box;
-  transition: background-color var(--app-motion-normal) ease-out;
-}
-
-.goal-ring-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: var(--app-surface);
-}
-
-.ring-percent {
-  font-size: 34rpx;
-  font-weight: 750;
-}
-
-.ring-label {
-  margin-top: 2rpx;
-  font-size: 20rpx;
+.goal-fraction {
+  color: var(--app-green);
+  font-size: 38rpx;
+  font-weight: 820;
 }
 
 .checkin-action {
   position: relative;
-  flex: 1;
+  margin-top: 26rpx;
 }
 
 .checkin-button {
   position: relative;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
   width: 100%;
-  height: 138rpx;
+  height: 124rpx;
+  gap: 16rpx;
   padding: 0;
-  border-radius: 28rpx;
+  border-radius: 30rpx;
   color: #fff;
-  background: var(--app-green);
+  background: linear-gradient(135deg, var(--app-green), var(--app-green-deep));
   box-shadow:
-    0 12rpx 0 rgba(20, 120, 48, 0.82),
-    0 20rpx 30rpx rgba(52, 199, 89, 0.2),
-    inset 0 3rpx 0 rgba(255, 255, 255, 0.26);
+    0 12rpx 0 var(--app-green-deep),
+    0 22rpx 34rpx rgba(32, 196, 107, 0.2),
+    inset 0 3rpx 0 rgba(255, 255, 255, 0.25);
   transition:
-    transform var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) var(--app-ease-out),
     box-shadow var(--app-motion-fast) ease-out,
     opacity var(--app-motion-fast) ease-out;
 }
@@ -551,22 +492,23 @@ function formatRecordDate(value: string) {
   opacity: 0.9;
   transform: translateY(8rpx) scale(0.99);
   box-shadow:
-    0 4rpx 0 rgba(20, 120, 48, 0.82),
-    0 8rpx 16rpx rgba(52, 199, 89, 0.16),
-    inset 0 2rpx 0 rgba(255, 255, 255, 0.18);
+    0 4rpx 0 var(--app-green-deep),
+    0 8rpx 18rpx rgba(32, 196, 107, 0.16);
 }
 
-.checkin-button.success {
-  animation: button-pop 280ms ease-out;
+.button-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .button-main {
   font-size: 34rpx;
-  font-weight: 750;
+  font-weight: 800;
 }
 
 .button-sub {
-  margin-top: 6rpx;
+  margin-top: 5rpx;
   font-size: 22rpx;
   opacity: 0.82;
 }
@@ -574,9 +516,9 @@ function formatRecordDate(value: string) {
 .success-ring {
   position: absolute;
   inset: 0;
-  border-radius: 28rpx;
+  border-radius: 30rpx;
   background: var(--app-green-soft);
-  animation: ring-spread 340ms ease-out forwards;
+  animation: ring-spread 420ms ease-out forwards;
 }
 
 .calendar-card {
@@ -585,7 +527,7 @@ function formatRecordDate(value: string) {
 
 .calendar-head {
   justify-content: space-between;
-  margin-bottom: 18rpx;
+  margin-bottom: 20rpx;
 }
 
 .icon-button {
@@ -596,8 +538,8 @@ function formatRecordDate(value: string) {
   height: 72rpx;
   padding: 0;
   border-radius: 50%;
-  color: var(--app-green);
-  background: var(--app-green-soft);
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
   font-size: 32rpx;
   transition:
     transform var(--app-motion-fast) ease-out,
@@ -606,7 +548,7 @@ function formatRecordDate(value: string) {
 
 .icon-button-pressed,
 .row-action-pressed {
-  opacity: 0.68;
+  opacity: 0.7;
   transform: scale(0.94);
 }
 
@@ -615,13 +557,19 @@ function formatRecordDate(value: string) {
   text-align: center;
 }
 
-.month-title {
+.month-title,
+.month-subtitle {
   display: block;
 }
 
 .month-title {
   font-size: 31rpx;
-  font-weight: 720;
+  font-weight: 780;
+}
+
+.month-subtitle {
+  margin-top: 4rpx;
+  font-size: 19rpx;
 }
 
 .calendar-grid {
@@ -633,7 +581,7 @@ function formatRecordDate(value: string) {
 .week-label {
   color: var(--app-label-tertiary);
   font-size: 20rpx;
-  font-weight: 600;
+  font-weight: 700;
   text-align: center;
 }
 
@@ -648,7 +596,7 @@ function formatRecordDate(value: string) {
   justify-content: center;
   min-width: 0;
   height: 66rpx;
-  border-radius: 50%;
+  border-radius: 20rpx;
   color: var(--app-label-secondary);
   font-size: 23rpx;
   background: transparent;
@@ -657,7 +605,12 @@ function formatRecordDate(value: string) {
 .calendar-day.active {
   color: var(--app-green);
   background: var(--app-green-soft);
-  font-weight: 650;
+  font-weight: 750;
+}
+
+.calendar-day.hot {
+  color: #fff;
+  background: linear-gradient(135deg, var(--app-green), var(--app-blue));
 }
 
 .calendar-day.today {
@@ -677,7 +630,7 @@ function formatRecordDate(value: string) {
   padding: 0 4rpx;
   border-radius: 999rpx;
   color: #fff;
-  background: var(--app-green);
+  background: var(--app-orange);
   font-size: 17rpx;
   line-height: 26rpx;
   text-align: center;
@@ -691,16 +644,11 @@ function formatRecordDate(value: string) {
 .record-row,
 .recent-row {
   position: relative;
-  min-height: 104rpx;
-  margin-left: 28rpx;
-  padding: 16rpx 24rpx 16rpx 0;
+  min-height: 106rpx;
+  margin-left: 24rpx;
+  padding: 18rpx 24rpx 18rpx 0;
   border-bottom: 1rpx solid var(--app-separator);
   box-sizing: border-box;
-}
-
-.recent-row {
-  min-height: 112rpx;
-  padding-left: 0;
 }
 
 .record-row:last-child,
@@ -709,24 +657,8 @@ function formatRecordDate(value: string) {
 }
 
 .record-row {
-  animation: item-enter 220ms ease-out both;
-}
-
-.record-icon {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 60rpx;
-  height: 60rpx;
-  margin-right: 20rpx;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-}
-
-.green-icon {
-  color: var(--app-green);
-  background: var(--app-green-soft);
+  gap: 18rpx;
+  animation: app-enter 230ms ease-out both;
 }
 
 .record-main {
@@ -742,7 +674,7 @@ function formatRecordDate(value: string) {
 .record-title,
 .recent-date {
   font-size: 28rpx;
-  font-weight: 550;
+  font-weight: 680;
 }
 
 .record-detail,
@@ -755,7 +687,7 @@ function formatRecordDate(value: string) {
   min-width: 88rpx;
   height: 56rpx;
   padding: 0 16rpx;
-  border-radius: 14rpx;
+  border-radius: 16rpx;
   color: var(--app-red);
   background: var(--app-pink-soft);
   font-size: 23rpx;
@@ -793,12 +725,12 @@ function formatRecordDate(value: string) {
 .timeline-dot {
   position: absolute;
   top: 34rpx;
-  left: 13rpx;
-  width: 16rpx;
-  height: 16rpx;
-  border: 5rpx solid var(--app-green-soft);
+  left: 12rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border: 5rpx solid var(--app-orange-soft);
   border-radius: 50%;
-  background: var(--app-green);
+  background: var(--app-orange);
   box-sizing: content-box;
 }
 
@@ -810,7 +742,6 @@ function formatRecordDate(value: string) {
 .recent-event {
   display: block;
   margin-top: 5rpx;
-  color: var(--app-label-secondary);
   font-size: 22rpx;
 }
 
@@ -820,48 +751,14 @@ function formatRecordDate(value: string) {
 }
 
 .empty-state {
-  padding: 46rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+  padding: 52rpx 24rpx;
   color: var(--app-label-secondary);
   font-size: 25rpx;
   text-align: center;
-}
-
-@keyframes content-enter {
-  from {
-    opacity: 0;
-    transform: translateY(16rpx);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes item-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10rpx);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes button-pop {
-  0% {
-    transform: translateY(5rpx) scale(0.98);
-  }
-
-  65% {
-    transform: translateY(-3rpx) scale(1.02);
-  }
-
-  100% {
-    transform: translateY(0) scale(1);
-  }
 }
 
 @keyframes success-pop {
@@ -880,7 +777,7 @@ function formatRecordDate(value: string) {
 
 @keyframes ring-spread {
   from {
-    opacity: 0.65;
+    opacity: 0.7;
     transform: scale(0.94);
   }
 

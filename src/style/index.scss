@@ -1,62 +1,81 @@
 :root,
 page {
-  --app-bg: #f5f5f7;
-  --app-surface: #ffffff;
-  --app-surface-secondary: #f0f0f3;
-  --app-surface-tertiary: #e8e8ed;
-  --app-label-primary: #141416;
-  --app-label-secondary: rgba(60, 60, 67, 0.76);
-  --app-label-tertiary: rgba(60, 60, 67, 0.48);
-  --app-separator: rgba(60, 60, 67, 0.14);
-  --app-fill: rgba(120, 120, 128, 0.1);
-  --app-fill-strong: rgba(120, 120, 128, 0.18);
-  --app-mask: rgba(0, 0, 0, 0.46);
-  --app-green: #34c759;
-  --app-green-soft: rgba(52, 199, 89, 0.14);
-  --app-blue: #007aff;
-  --app-blue-soft: rgba(0, 122, 255, 0.13);
-  --app-orange: #ff9500;
-  --app-orange-soft: rgba(255, 149, 0, 0.14);
-  --app-pink: #ff2d55;
-  --app-pink-soft: rgba(255, 45, 85, 0.13);
-  --app-red: #ff3b30;
-  --app-purple: #af52de;
-  --app-purple-soft: rgba(175, 82, 222, 0.14);
-  --app-card-radius: 30rpx;
+  --app-bg: #eef7f2;
+  --app-bg-2: #f7fbff;
+  --app-surface: rgba(255, 255, 255, 0.92);
+  --app-surface-solid: #ffffff;
+  --app-surface-secondary: rgba(238, 247, 242, 0.86);
+  --app-surface-tertiary: #e3efe9;
+  --app-glass: rgba(255, 255, 255, 0.74);
+  --app-label-primary: #12201a;
+  --app-label-secondary: rgba(18, 32, 26, 0.68);
+  --app-label-tertiary: rgba(18, 32, 26, 0.42);
+  --app-separator: rgba(30, 74, 55, 0.13);
+  --app-fill: rgba(31, 178, 104, 0.09);
+  --app-fill-strong: rgba(31, 178, 104, 0.16);
+  --app-mask: rgba(6, 20, 15, 0.5);
+  --app-green: #20c46b;
+  --app-green-deep: #12894b;
+  --app-green-soft: rgba(32, 196, 107, 0.15);
+  --app-blue: #1688ff;
+  --app-blue-deep: #0f63c9;
+  --app-blue-soft: rgba(22, 136, 255, 0.13);
+  --app-orange: #ff9f1c;
+  --app-orange-soft: rgba(255, 159, 28, 0.16);
+  --app-pink: #ff4d86;
+  --app-pink-soft: rgba(255, 77, 134, 0.14);
+  --app-gold: #d9a520;
+  --app-gold-soft: rgba(217, 165, 32, 0.18);
+  --app-red: #ff4d4f;
+  --app-purple: #8b5cf6;
+  --app-purple-soft: rgba(139, 92, 246, 0.15);
+  --app-card-radius: 28rpx;
   --app-control-radius: 22rpx;
+  --app-pill-radius: 999rpx;
   --app-gutter: 32rpx;
-  --app-shadow: 0 1rpx 0 rgba(0, 0, 0, 0.03), 0 12rpx 34rpx rgba(0, 0, 0, 0.055);
+  --app-shadow: 0 2rpx 0 rgba(255, 255, 255, 0.78), 0 18rpx 48rpx rgba(31, 88, 58, 0.12);
+  --app-shadow-strong: 0 18rpx 56rpx rgba(20, 97, 63, 0.18);
   --app-motion-fast: 160ms;
-  --app-motion-normal: 240ms;
+  --app-motion-normal: 260ms;
+  --app-motion-slow: 420ms;
   --app-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --app-ease-spring: cubic-bezier(0.18, 0.89, 0.32, 1.28);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
   background: var(--app-bg);
 }
 
 .theme-dark {
-  --app-bg: #000000;
-  --app-surface: #1c1c1e;
-  --app-surface-secondary: #2c2c2e;
-  --app-surface-tertiary: #3a3a3c;
-  --app-label-primary: #ffffff;
-  --app-label-secondary: rgba(235, 235, 245, 0.72);
-  --app-label-tertiary: rgba(235, 235, 245, 0.42);
-  --app-separator: rgba(84, 84, 88, 0.62);
-  --app-fill: rgba(120, 120, 128, 0.24);
-  --app-fill-strong: rgba(120, 120, 128, 0.36);
+  --app-bg: #07110d;
+  --app-bg-2: #0b1720;
+  --app-surface: rgba(20, 34, 29, 0.92);
+  --app-surface-solid: #14221d;
+  --app-surface-secondary: rgba(19, 31, 27, 0.9);
+  --app-surface-tertiary: #20352d;
+  --app-glass: rgba(23, 38, 32, 0.72);
+  --app-label-primary: #f4fff8;
+  --app-label-secondary: rgba(230, 247, 238, 0.72);
+  --app-label-tertiary: rgba(230, 247, 238, 0.44);
+  --app-separator: rgba(210, 255, 230, 0.12);
+  --app-fill: rgba(64, 220, 130, 0.13);
+  --app-fill-strong: rgba(64, 220, 130, 0.22);
   --app-mask: rgba(0, 0, 0, 0.68);
-  --app-green: #30d158;
-  --app-green-soft: rgba(48, 209, 88, 0.18);
-  --app-blue: #0a84ff;
-  --app-blue-soft: rgba(10, 132, 255, 0.2);
-  --app-orange: #ff9f0a;
-  --app-orange-soft: rgba(255, 159, 10, 0.2);
-  --app-pink: #ff375f;
-  --app-pink-soft: rgba(255, 55, 95, 0.2);
-  --app-red: #ff453a;
-  --app-purple: #bf5af2;
-  --app-purple-soft: rgba(191, 90, 242, 0.2);
-  --app-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.035), 0 16rpx 34rpx rgba(0, 0, 0, 0.24);
+  --app-green: #34d982;
+  --app-green-deep: #1fb365;
+  --app-green-soft: rgba(52, 217, 130, 0.18);
+  --app-blue: #4aa3ff;
+  --app-blue-deep: #2f7fe6;
+  --app-blue-soft: rgba(74, 163, 255, 0.2);
+  --app-orange: #ffb340;
+  --app-orange-soft: rgba(255, 179, 64, 0.2);
+  --app-pink: #ff6d9e;
+  --app-pink-soft: rgba(255, 109, 158, 0.2);
+  --app-gold: #f0c85a;
+  --app-gold-soft: rgba(240, 200, 90, 0.22);
+  --app-red: #ff6b6b;
+  --app-purple: #a78bfa;
+  --app-purple-soft: rgba(167, 139, 250, 0.2);
+  --app-shadow: 0 1rpx 0 rgba(255, 255, 255, 0.04), 0 20rpx 52rpx rgba(0, 0, 0, 0.34);
+  --app-shadow-strong: 0 24rpx 64rpx rgba(0, 0, 0, 0.42);
 }
 
 button,
@@ -68,15 +87,23 @@ button::after {
   border: 0;
 }
 
+.app-shell {
+  background:
+    radial-gradient(circle at 12% 4%, rgba(32, 196, 107, 0.2), transparent 34%),
+    radial-gradient(circle at 92% 12%, rgba(22, 136, 255, 0.16), transparent 30%),
+    linear-gradient(180deg, var(--app-bg-2), var(--app-bg));
+}
+
 .app-page {
   min-height: 100vh;
   padding: 0 var(--app-gutter) calc(150rpx + env(safe-area-inset-bottom));
   color: var(--app-label-primary);
-  background: var(--app-bg);
+  background: transparent;
   box-sizing: border-box;
 }
 
-.ios-card {
+.ios-card,
+.app-card {
   border: 1rpx solid rgba(255, 255, 255, 0.72);
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
@@ -84,31 +111,96 @@ button::after {
   box-sizing: border-box;
 }
 
-.theme-dark .ios-card {
-  border-color: rgba(255, 255, 255, 0.055);
+.theme-dark .ios-card,
+.theme-dark .app-card {
+  border-color: rgba(255, 255, 255, 0.07);
 }
 
-.ios-section-title {
+.ios-section-title,
+.app-section-title {
   display: block;
   margin: 44rpx 12rpx 16rpx;
   color: var(--app-label-secondary);
   font-size: 25rpx;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 1.35;
 }
 
-.ios-pressed {
-  opacity: 0.72;
-  transform: scale(0.985);
+.ios-pressed,
+.app-pressed {
+  opacity: 0.74;
+  transform: scale(0.975);
 }
 
 .numeric {
   font-variant-numeric: tabular-nums;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .app-shell {
-    --app-motion-fast: 1ms;
-    --app-motion-normal: 1ms;
+.app-enter {
+  animation: app-enter var(--app-motion-normal) var(--app-ease-out) both;
+}
+
+.app-pop {
+  animation: app-pop var(--app-motion-normal) var(--app-ease-spring) both;
+}
+
+.accent-green {
+  --accent: var(--app-green);
+  --accent-soft: var(--app-green-soft);
+}
+
+.accent-blue {
+  --accent: var(--app-blue);
+  --accent-soft: var(--app-blue-soft);
+}
+
+.accent-orange {
+  --accent: var(--app-orange);
+  --accent-soft: var(--app-orange-soft);
+}
+
+.accent-pink {
+  --accent: var(--app-pink);
+  --accent-soft: var(--app-pink-soft);
+}
+
+.accent-gold {
+  --accent: var(--app-gold);
+  --accent-soft: var(--app-gold-soft);
+}
+
+@keyframes app-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18rpx) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes app-pop {
+  0% {
+    transform: scale(0.96);
+  }
+
+  68% {
+    transform: scale(1.025);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-120%) rotate(12deg);
+  }
+
+  to {
+    transform: translateX(160%) rotate(12deg);
   }
 }

@@ -35,7 +35,7 @@ export function getTodayCheckIns() {
 }
 
 export function createCheckIn() {
-  return http.post<CheckInRecord>('/api/checkins')
+  return http.post<CheckInRecord>('/api/checkins', {})
 }
 
 export function getRecentCheckIns(limit = 20) {

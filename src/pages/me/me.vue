@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import type { CheckInBadge } from '@/api/checkins'
+import type { Achievement } from '@/api/achievements'
 import type { ThemeMode } from '@/store'
-import { getCheckInStats } from '@/api/checkins'
+import { getAchievements } from '@/api/achievements'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
 import { useThemeStore, useTokenStore, useUserStore } from '@/store'
 import { triggerSuccessHaptic } from '@/utils/haptics'
@@ -17,9 +17,10 @@ const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 const saving = ref(false)
+const profileReady = ref(false)
 const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
-const badges = ref<CheckInBadge[]>([])
+const achievements = ref<Achievement[]>([])
 const genderOptions = [
   { label: '未设置', value: '' },
   { label: '男', value: 'male' },
@@ -27,6 +28,10 @@ const genderOptions = [
   { label: '其他', value: 'other' },
 ]
 const dailyGoalOptions = Array.from({ length: 9 }, (_, index) => `${index + 1}`)
+const themeOptions = [
+  { label: '浅色', value: 'light' as const },
+  { label: '深色', value: 'dark' as const },
+]
 const form = reactive({
   nickname: '',
   avatarUrl: '',
@@ -43,39 +48,52 @@ const genderIndex = computed(() => {
 })
 const genderLabel = computed(() => genderOptions[genderIndex.value].label)
 const dailyGoalIndex = computed(() => Math.max(0, Math.min(8, form.dailyGoal - 1)))
-const unlockedBadgeCount = computed(() => badges.value.filter(item => item.unlocked).length)
+const unlockedAchievementCount = computed(() => achievements.value.filter(item => item.unlocked).length)
+const completionPercent = computed(() => {
+  if (achievements.value.length === 0) {
+    return 0
+  }
+  return Math.round((unlockedAchievementCount.value / achievements.value.length) * 100)
+})
+const profileAccent = computed(() => form.gender === 'male' ? 'blue' : 'pink')
+let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 onShow(() => {
   initProfile()
 })
 
 async function initProfile() {
+  profileReady.value = false
   if (!tokenStore.hasLogin()) {
     await tokenStore.wxLogin()
   }
   else {
     await userStore.fetchUserInfo()
   }
-  const [userInfo, stats] = [userStore.userInfo, await getCheckInStats()]
+  const [userInfo, nextAchievements] = [userStore.userInfo, await getAchievements()]
   form.nickname = userInfo.nickname || ''
   form.avatarUrl = userInfo.avatarUrl || userInfo.avatar || ''
   form.gender = userInfo.gender || ''
   form.birthday = userInfo.birthday || ''
   form.dailyGoal = userInfo.dailyGoal || 1
   form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
-  badges.value = stats.badges
+  achievements.value = nextAchievements
+  profileReady.value = true
 }
 
 function handleGenderChange(event: { detail: { value: number } }) {
   form.gender = genderOptions[event.detail.value]?.value || ''
+  scheduleProfileSave()
 }
 
 function handleBirthdayChange(event: { detail: { value: string } }) {
   form.birthday = event.detail.value
+  scheduleProfileSave()
 }
 
 function handleDailyGoalChange(event: { detail: { value: number } }) {
   form.dailyGoal = Number(dailyGoalOptions[event.detail.value] || 1)
+  scheduleProfileSave()
 }
 
 function selectTheme(mode: ThemeMode) {
@@ -84,6 +102,22 @@ function selectTheme(mode: ThemeMode) {
   }
   themeStore.setMode(mode)
   triggerSuccessHaptic()
+}
+
+async function refreshAchievements() {
+  achievements.value = await getAchievements()
+}
+
+function scheduleProfileSave() {
+  if (!profileReady.value) {
+    return
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+  }
+  saveTimer = setTimeout(() => {
+    void saveProfile()
+  }, 250)
 }
 
 async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
@@ -98,6 +132,7 @@ async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
     const res = await uploadUserAvatar(avatarUrl)
     form.avatarUrl = res.avatarUrl
     avatarTempUrl.value = ''
+    await saveProfile()
     uni.showToast({
       title: '头像已更新',
       icon: 'success',
@@ -108,7 +143,10 @@ async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
   }
 }
 
-async function handleSave() {
+async function saveProfile() {
+  if (!profileReady.value || saving.value) {
+    return
+  }
   if (!form.nickname.trim()) {
     uni.showToast({
       title: '请输入昵称',
@@ -137,10 +175,8 @@ async function handleSave() {
       heightCm,
     })
     userStore.setUserInfo(userInfo)
-    uni.showToast({
-      title: '已保存',
-      icon: 'success',
-    })
+    await refreshAchievements()
+    triggerSuccessHaptic()
   }
   finally {
     saving.value = false
@@ -150,138 +186,145 @@ async function handleSave() {
 
 <template>
   <view class="app-page profile-page">
-    <ios-page-header title="我的" subtitle="个人健康资料" />
+    <ios-page-header title="我的" subtitle="个人健康档案" accent="pink" />
 
-    <view class="profile-summary ios-card">
-      <button
-        class="avatar-button"
-        open-type="chooseAvatar"
-        hover-class="avatar-button-pressed"
-        @chooseavatar="handleChooseAvatar"
-      >
-        <image class="avatar" :src="avatarPreview" mode="aspectFill" />
-        <view v-if="uploadingAvatar" class="avatar-mask">
-          上传中
+    <view class="profile-summary-shell" :class="`accent-${profileAccent}`">
+      <app-card :accent="profileAccent" elevated>
+        <view class="profile-summary-content">
+          <button
+            class="avatar-button"
+            open-type="chooseAvatar"
+            hover-class="avatar-button-pressed"
+            @chooseavatar="handleChooseAvatar"
+          >
+            <image class="avatar" :src="avatarPreview" mode="aspectFill" />
+            <view v-if="uploadingAvatar" class="avatar-mask">
+              上传中
+            </view>
+          </button>
+
+          <view class="profile-copy">
+            <text class="profile-title">{{ form.nickname || '微信用户' }}</text>
+            <text class="profile-subtitle">{{ unlockedAchievementCount }} 项成就已解锁</text>
+            <view class="profile-stats">
+              <view class="profile-stat">
+                <text class="stat-value numeric">{{ completionPercent }}%</text>
+                <text class="stat-label">成就</text>
+              </view>
+              <view class="profile-stat">
+                <text class="stat-value numeric">{{ form.dailyGoal }}</text>
+                <text class="stat-label">每日目标</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="profile-progress">
+            <progress-ring :percent="completionPercent" label="成就" :accent="profileAccent" />
+          </view>
         </view>
-      </button>
-      <view class="profile-copy">
-        <text class="profile-title">{{ form.nickname || '微信用户' }}</text>
-        <text class="profile-subtitle">{{ unlockedBadgeCount }} 项成就已达成</text>
-      </view>
+      </app-card>
     </view>
 
     <text class="ios-section-title">个人资料</text>
-    <view class="form-section ios-card">
-      <view class="field">
-        <text class="field-icon blue-icon i-carbon-user" />
-        <text class="field-label">昵称</text>
-        <input
-          v-model="form.nickname"
-          class="field-input"
-          type="nickname"
-          :maxlength="30"
-          placeholder="请输入昵称"
-          placeholder-class="placeholder"
-        >
-      </view>
-
-      <picker :value="genderIndex" :range="genderOptions" range-key="label" @change="handleGenderChange">
-        <view class="field picker-field">
-          <text class="field-icon pink-icon i-carbon-gender-male" />
-          <text class="field-label">性别</text>
-          <view class="field-value">
-            {{ genderLabel }}
+    <view class="form-section-shell">
+      <app-card accent="blue">
+        <view class="form-section-content">
+          <view class="field">
+            <app-icon name="profile" accent="blue" size="sm" />
+            <text class="field-label">昵称</text>
+            <input
+              v-model="form.nickname"
+              class="field-input"
+              type="nickname"
+              :maxlength="30"
+              placeholder="请输入昵称"
+              placeholder-class="placeholder"
+              @blur="scheduleProfileSave"
+              @confirm="scheduleProfileSave"
+            >
           </view>
-          <text class="field-chevron i-carbon-chevron-right" />
-        </view>
-      </picker>
 
-      <picker mode="date" :value="form.birthday || '2000-01-01'" @change="handleBirthdayChange">
-        <view class="field picker-field">
-          <text class="field-icon orange-icon i-carbon-calendar" />
-          <text class="field-label">生日</text>
-          <view class="field-value" :class="{ muted: !form.birthday }">
-            {{ form.birthday || '未设置' }}
+          <picker :value="genderIndex" :range="genderOptions" range-key="label" @change="handleGenderChange">
+            <view class="field picker-field">
+              <app-icon name="i-carbon-gender-male" accent="pink" size="sm" />
+              <text class="field-label">性别</text>
+              <view class="field-value">
+                {{ genderLabel }}
+              </view>
+              <text class="field-chevron i-carbon-chevron-right" />
+            </view>
+          </picker>
+
+          <picker mode="date" :value="form.birthday || '2000-01-01'" @change="handleBirthdayChange">
+            <view class="field picker-field">
+              <app-icon name="i-carbon-calendar" accent="orange" size="sm" />
+              <text class="field-label">生日</text>
+              <view class="field-value" :class="{ muted: !form.birthday }">
+                {{ form.birthday || '未设置' }}
+              </view>
+              <text class="field-chevron i-carbon-chevron-right" />
+            </view>
+          </picker>
+
+          <picker :value="dailyGoalIndex" :range="dailyGoalOptions" @change="handleDailyGoalChange">
+            <view class="field picker-field">
+              <app-icon name="target" accent="green" size="sm" />
+              <text class="field-label">每日目标</text>
+              <view class="field-value">
+                {{ form.dailyGoal }} 次
+              </view>
+              <text class="field-chevron i-carbon-chevron-right" />
+            </view>
+          </picker>
+
+          <view class="field">
+            <app-icon name="i-carbon-ruler" accent="gold" size="sm" />
+            <text class="field-label">身高</text>
+            <view class="field-unit-input">
+              <input
+                v-model="form.heightCm"
+                class="field-input"
+                type="digit"
+                :maxlength="5"
+                placeholder="未设置"
+                placeholder-class="placeholder"
+                @blur="scheduleProfileSave"
+                @confirm="scheduleProfileSave"
+              >
+              <text>cm</text>
+            </view>
           </view>
-          <text class="field-chevron i-carbon-chevron-right" />
         </view>
-      </picker>
-
-      <picker :value="dailyGoalIndex" :range="dailyGoalOptions" @change="handleDailyGoalChange">
-        <view class="field picker-field">
-          <text class="field-icon green-icon i-carbon-chart-bar-target" />
-          <text class="field-label">每日目标</text>
-          <view class="field-value">
-            {{ form.dailyGoal }} 次
-          </view>
-          <text class="field-chevron i-carbon-chevron-right" />
-        </view>
-      </picker>
-
-      <view class="field">
-        <text class="field-icon purple-icon i-carbon-ruler" />
-        <text class="field-label">身高</text>
-        <view class="field-unit-input">
-          <input
-            v-model="form.heightCm"
-            class="field-input"
-            type="digit"
-            :maxlength="5"
-            placeholder="未设置"
-            placeholder-class="placeholder"
-          >
-          <text>cm</text>
-        </view>
-      </view>
+      </app-card>
     </view>
 
     <text class="ios-section-title">外观</text>
-    <view class="appearance-card ios-card">
-      <view class="appearance-label">
-        <text class="field-icon blue-icon" :class="themeStore.isDark ? 'i-carbon-moon' : 'i-carbon-sun'" />
-        <text>主题</text>
-      </view>
-      <view class="theme-switch">
-        <button :class="{ active: themeStore.mode === 'light' }" @click="selectTheme('light')">
-          浅色
-        </button>
-        <button :class="{ active: themeStore.mode === 'dark' }" @click="selectTheme('dark')">
-          深色
-        </button>
-      </view>
+    <view class="appearance-card-shell">
+      <app-card accent="gold">
+        <view class="appearance-card-content">
+          <view class="appearance-label">
+            <app-icon :name="themeStore.isDark ? 'i-carbon-moon' : 'i-carbon-sun'" accent="gold" size="sm" />
+            <text>主题</text>
+          </view>
+          <view class="theme-control">
+            <app-segmented-control :model-value="themeStore.mode" :options="themeOptions" @change="selectTheme" />
+          </view>
+        </view>
+      </app-card>
     </view>
 
     <view class="achievement-heading">
       <text class="ios-section-title achievement-section-title">我的成就</text>
-      <text class="achievement-count numeric">{{ unlockedBadgeCount }}/{{ badges.length }}</text>
+      <text class="achievement-count numeric">{{ unlockedAchievementCount }}/{{ achievements.length }}</text>
     </view>
     <view class="badge-grid">
-      <view
-        v-for="(badge, index) in badges"
-        :key="badge.key"
-        class="badge-item ios-card"
-        :class="{ unlocked: badge.unlocked }"
-      >
-        <view class="badge-icon">
-          <text :class="badge.unlocked ? 'i-carbon-trophy-filled' : 'i-carbon-trophy'" />
-        </view>
-        <view class="badge-copy">
-          <text class="badge-name">{{ badge.name }}</text>
-          <text class="badge-desc">{{ badge.description }}</text>
-        </view>
-        <text v-if="badge.unlocked" class="badge-state i-carbon-checkmark-filled" />
-        <text v-else class="badge-index numeric">{{ String(index + 1).padStart(2, '0') }}</text>
-      </view>
+      <achievement-badge
+        v-for="(achievement, index) in achievements"
+        :key="achievement.key"
+        :achievement="achievement"
+        :style="{ animationDelay: `${Math.min(index, 10) * 35}ms` }"
+      />
     </view>
-
-    <button
-      class="save-button"
-      :disabled="saving"
-      hover-class="save-button-pressed"
-      @click="handleSave"
-    >
-      {{ saving ? '保存中' : '保存资料' }}
-    </button>
   </view>
 </template>
 
@@ -291,50 +334,51 @@ async function handleSave() {
   padding-left: 0;
 }
 
-.profile-summary,
-.form-section,
-.appearance-card,
-.badge-grid,
-.save-button {
+.profile-summary-shell,
+.form-section-shell,
+.appearance-card-shell,
+.badge-grid {
   margin-right: var(--app-gutter);
   margin-left: var(--app-gutter);
 }
 
-.profile-summary {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-height: 164rpx;
-  padding: 28rpx;
-  border-color: rgba(0, 122, 255, 0.14);
-  box-sizing: border-box;
-  animation: enter var(--app-motion-normal) var(--app-ease-out) both;
-  overflow: hidden;
+.profile-summary-shell {
+  --profile-accent: var(--app-pink);
+  --profile-accent-soft: var(--app-pink-soft);
+  --profile-accent-shadow: rgba(255, 77, 134, 0.16);
 }
 
-.profile-summary::before {
-  position: absolute;
-  top: 0;
-  right: 28rpx;
-  left: 28rpx;
-  height: 5rpx;
-  border-radius: 0 0 999rpx 999rpx;
-  background: var(--app-blue);
-  content: '';
+.profile-summary-shell.accent-blue {
+  --profile-accent: var(--app-blue);
+  --profile-accent-soft: var(--app-blue-soft);
+  --profile-accent-shadow: rgba(22, 136, 255, 0.18);
+}
+
+.profile-summary-content {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+  min-height: 194rpx;
+  padding: 30rpx;
+  box-sizing: border-box;
+  animation: app-enter var(--app-motion-normal) var(--app-ease-out) both;
 }
 
 .avatar-button {
   position: relative;
   flex: 0 0 auto;
-  width: 106rpx;
-  height: 106rpx;
+  width: 112rpx;
+  height: 112rpx;
   padding: 0;
+  border: 6rpx solid var(--profile-accent-soft);
   border-radius: 50%;
-  background: var(--app-fill);
+  background: var(--profile-accent-soft);
+  box-shadow: 0 14rpx 30rpx var(--profile-accent-shadow);
   overflow: hidden;
   transition:
     transform var(--app-motion-fast) ease-out,
     opacity var(--app-motion-fast) ease-out;
+  box-sizing: border-box;
 }
 
 .avatar-button-pressed {
@@ -343,8 +387,8 @@ async function handleSave() {
 }
 
 .avatar {
-  width: 106rpx;
-  height: 106rpx;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: var(--app-fill);
 }
@@ -363,7 +407,6 @@ async function handleSave() {
 .profile-copy {
   flex: 1;
   min-width: 0;
-  margin-left: 24rpx;
 }
 
 .profile-title,
@@ -372,32 +415,68 @@ async function handleSave() {
 }
 
 .profile-title {
-  font-size: 36rpx;
-  font-weight: 740;
+  font-size: 38rpx;
+  font-weight: 840;
+  line-height: 1.12;
 }
 
 .profile-subtitle {
-  margin-top: 7rpx;
+  margin-top: 8rpx;
   color: var(--app-label-secondary);
   font-size: 23rpx;
 }
 
-.field-chevron {
-  flex: 0 0 auto;
-  color: var(--app-label-tertiary);
-  font-size: 28rpx;
+.profile-stats {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 18rpx;
 }
 
-.form-section {
+.profile-stat {
+  min-width: 106rpx;
+  padding: 10rpx 14rpx;
+  border-radius: 18rpx;
+  background: var(--app-fill);
+  box-sizing: border-box;
+}
+
+.stat-value,
+.stat-label {
+  display: block;
+}
+
+.stat-value {
+  color: var(--app-pink);
+  font-size: 25rpx;
+  font-weight: 820;
+}
+
+.profile-summary-shell.accent-blue .stat-value {
+  color: var(--app-blue);
+}
+
+.stat-label {
+  margin-top: 2rpx;
+  color: var(--app-label-secondary);
+  font-size: 18rpx;
+}
+
+.profile-progress {
+  flex: 0 0 auto;
+  transform: scale(0.78);
+  transform-origin: center right;
+}
+
+.form-section-content {
   overflow: hidden;
-  animation: enter var(--app-motion-normal) 50ms var(--app-ease-out) both;
+  animation: app-enter var(--app-motion-normal) 50ms var(--app-ease-out) both;
 }
 
 .field {
   display: flex;
   align-items: center;
-  min-height: 104rpx;
-  margin-left: 28rpx;
+  min-height: 106rpx;
+  margin-left: 24rpx;
   padding: 0 26rpx 0 0;
   border-bottom: 1rpx solid var(--app-separator);
   box-sizing: border-box;
@@ -407,48 +486,18 @@ async function handleSave() {
   border-bottom: 0;
 }
 
-.field-icon {
-  display: flex;
+.field-chevron {
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 56rpx;
-  height: 56rpx;
-  margin-right: 20rpx;
-  border-radius: 14rpx;
+  color: var(--app-label-tertiary);
   font-size: 28rpx;
-}
-
-.blue-icon {
-  color: var(--app-blue);
-  background: var(--app-blue-soft);
-}
-
-.pink-icon {
-  color: var(--app-pink);
-  background: var(--app-pink-soft);
-}
-
-.orange-icon {
-  color: var(--app-orange);
-  background: var(--app-orange-soft);
-}
-
-.green-icon {
-  color: var(--app-green);
-  background: var(--app-green-soft);
-}
-
-.purple-icon {
-  color: var(--app-purple);
-  background: var(--app-purple-soft);
 }
 
 .field-label {
-  flex: 0 0 152rpx;
+  flex: 0 0 150rpx;
+  margin-left: 18rpx;
   color: var(--app-label-primary);
   font-size: 28rpx;
-  font-weight: 500;
+  font-weight: 680;
 }
 
 .field-input,
@@ -483,45 +532,27 @@ async function handleSave() {
   flex: 0 1 180rpx;
 }
 
-.appearance-card {
+.appearance-card-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 104rpx;
-  padding: 16rpx 24rpx 16rpx 28rpx;
+  gap: 20rpx;
+  min-height: 108rpx;
+  padding: 18rpx 24rpx 18rpx 28rpx;
   box-sizing: border-box;
-  animation: enter var(--app-motion-normal) 70ms var(--app-ease-out) both;
+  animation: app-enter var(--app-motion-normal) 70ms var(--app-ease-out) both;
 }
 
 .appearance-label {
   display: flex;
   align-items: center;
+  gap: 16rpx;
   font-size: 28rpx;
+  font-weight: 680;
 }
 
-.theme-switch {
-  display: flex;
-  padding: 4rpx;
-  border-radius: 16rpx;
-  background: var(--app-fill);
-}
-
-.theme-switch button {
-  min-width: 92rpx;
-  height: 58rpx;
-  padding: 0 16rpx;
-  border-radius: 13rpx;
-  color: var(--app-label-secondary);
-  background: transparent;
-  font-size: 24rpx;
-  line-height: 58rpx;
-}
-
-.theme-switch button.active {
-  color: var(--app-label-primary);
-  background: var(--app-surface);
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
-  font-weight: 650;
+.theme-control {
+  flex: 0 0 232rpx;
 }
 
 .achievement-heading {
@@ -542,144 +573,23 @@ async function handleSave() {
 }
 
 .badge-grid {
-  display: block;
-  border: 1rpx solid rgba(255, 255, 255, 0.72);
-  border-radius: var(--app-card-radius);
-  background: var(--app-surface);
-  box-shadow: var(--app-shadow);
-  overflow: hidden;
-  animation: enter var(--app-motion-normal) 90ms var(--app-ease-out) both;
-  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16rpx;
 }
 
-.theme-dark .badge-grid {
-  border-color: rgba(255, 255, 255, 0.055);
+.badge-grid :deep(.achievement-badge) {
+  animation: app-enter 260ms var(--app-ease-out) both;
 }
 
-.badge-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  min-height: 128rpx;
-  margin-left: 28rpx;
-  padding: 22rpx 24rpx 22rpx 0;
-  border: 0;
-  border-bottom: 1rpx solid var(--app-separator);
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  box-sizing: border-box;
-  opacity: 0.62;
-}
-
-.badge-item:last-child {
-  border-bottom: 0;
-}
-
-.badge-item.unlocked {
-  opacity: 1;
-}
-
-.badge-icon {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 58rpx;
-  height: 58rpx;
-  border-radius: 50%;
-  color: var(--app-orange);
-  background: var(--app-orange-soft);
-  font-size: 29rpx;
-}
-
-.badge-item:nth-child(3n + 2) .badge-icon {
-  color: var(--app-pink);
-  background: var(--app-pink-soft);
-}
-
-.badge-item:nth-child(3n) .badge-icon {
-  color: var(--app-blue);
-  background: var(--app-blue-soft);
-}
-
-.badge-copy {
-  flex: 1;
-  min-width: 0;
-  margin-left: 14rpx;
-}
-
-.badge-name,
-.badge-desc {
-  display: block;
-}
-
-.badge-name {
-  font-size: 26rpx;
-  font-weight: 650;
-}
-
-.badge-desc {
-  margin-top: 7rpx;
-  color: var(--app-label-secondary);
-  font-size: 20rpx;
-  line-height: 1.4;
-}
-
-.badge-state,
-.badge-index {
-  position: static;
-  flex: 0 0 auto;
-  margin-left: 14rpx;
-  color: var(--app-green);
-  font-size: 27rpx;
-}
-
-.badge-index {
-  color: var(--app-label-tertiary);
-  font-size: 20rpx;
-}
-
-.save-button {
-  height: 92rpx;
-  margin-top: 36rpx;
-  border-radius: var(--app-control-radius);
-  color: #fff;
-  background: var(--app-green);
-  box-shadow:
-    0 10rpx 0 rgba(20, 120, 48, 0.72),
-    0 18rpx 30rpx rgba(52, 199, 89, 0.16);
-  font-size: 30rpx;
-  font-weight: 700;
-  line-height: 92rpx;
-  transition:
-    transform var(--app-motion-fast) var(--app-ease-out),
-    box-shadow var(--app-motion-fast) ease-out,
-    opacity var(--app-motion-fast) ease-out;
-}
-
-.save-button-pressed {
-  opacity: 0.82;
-  transform: translateY(6rpx) scale(0.99);
-  box-shadow:
-    0 4rpx 0 rgba(20, 120, 48, 0.72),
-    0 8rpx 18rpx rgba(52, 199, 89, 0.14);
-}
-
-.save-button[disabled] {
-  opacity: 0.46;
-}
-
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(14rpx);
+@media screen and (max-width: 360px) {
+  .profile-summary-content {
+    gap: 16rpx;
+    padding: 26rpx 22rpx;
   }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  .profile-progress {
+    display: none;
   }
 }
 </style>
