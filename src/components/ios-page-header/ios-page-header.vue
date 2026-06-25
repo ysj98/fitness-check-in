@@ -1,12 +1,15 @@
 <script lang="ts" setup>
-withDefaults(defineProps<{
-  title: string
-  subtitle?: string
-  accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
-}>(), {
-  subtitle: '',
-  accent: 'green',
-})
+withDefaults(
+  defineProps<{
+    title: string
+    subtitle?: string
+    accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
+  }>(),
+  {
+    subtitle: '',
+    accent: 'green',
+  },
+)
 
 const topInset = ref(0)
 const capsuleBarHeight = ref(44)
@@ -20,8 +23,7 @@ onMounted(() => {
     const capsule = uni.getMenuButtonBoundingClientRect()
     capsuleBarHeight.value = capsule.height + Math.max((capsule.top - topInset.value) * 2, 8)
     // #endif
-  }
-  catch {
+  } catch {
     topInset.value = 0
     capsuleBarHeight.value = 44
   }

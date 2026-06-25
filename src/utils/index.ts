@@ -37,8 +37,7 @@ export function getEnvBaseUrl() {
       release: import.meta.env.VITE_SERVER_BASEURL__WEIXIN_RELEASE,
     }
     return urls[envVersion] || fallback
-  }
-  catch {
+  } catch {
     return fallback
   }
 }

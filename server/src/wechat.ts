@@ -28,7 +28,7 @@ export async function exchangeWeChatCode(code: string): Promise<WxSession> {
     throw new Error(`WeChat request failed: ${response.status}`)
   }
 
-  const data = await response.json() as WeChatSessionResponse
+  const data = (await response.json()) as WeChatSessionResponse
   if (!data.openid) {
     throw new Error(data.errmsg || 'WeChat login failed')
   }

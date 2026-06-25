@@ -210,15 +210,15 @@ NODE_OPTIONS="--max-old-space-size=256"
 
 变量说明：
 
-| 变量 | 作用 |
-| --- | --- |
-| `DATABASE_URL` | 宿主机 MySQL 连接地址 |
-| `JWT_SECRET` | 登录 token 签名密钥 |
-| `WECHAT_APPID` | 微信小程序 AppID |
-| `WECHAT_SECRET` | 微信小程序 AppSecret |
-| `PORT` | 后端监听端口 |
-| `HOST` | 后端监听地址 |
-| `NODE_OPTIONS` | Node.js 运行参数 |
+| 变量            | 作用                  |
+| --------------- | --------------------- |
+| `DATABASE_URL`  | 宿主机 MySQL 连接地址 |
+| `JWT_SECRET`    | 登录 token 签名密钥   |
+| `WECHAT_APPID`  | 微信小程序 AppID      |
+| `WECHAT_SECRET` | 微信小程序 AppSecret  |
+| `PORT`          | 后端监听端口          |
+| `HOST`          | 后端监听地址          |
+| `NODE_OPTIONS`  | Node.js 运行参数      |
 
 生成随机 `JWT_SECRET`：
 

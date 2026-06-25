@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
 import { getChinaDayRange } from './date.js'
 
-function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], weightRecords: AppWeightRecord[] } {
+function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; weightRecords: AppWeightRecord[] } {
   const users: AppUser[] = []
   const checkIns: AppCheckIn[] = []
   const weightRecords: AppWeightRecord[] = []
@@ -22,7 +22,7 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
     user: {
       async upsert(args: any) {
         const openid = args.where.openid
-        let user = users.find(item => item.openid === openid)
+        let user = users.find((item) => item.openid === openid)
         if (!user) {
           user = {
             id: userId++,
@@ -41,10 +41,10 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
         return user
       },
       async findUnique(args: any) {
-        return users.find(item => item.id === args.where.id) || null
+        return users.find((item) => item.id === args.where.id) || null
       },
       async update(args: any) {
-        const user = users.find(item => item.id === args.where.id)
+        const user = users.find((item) => item.id === args.where.id)
         if (!user) {
           throw new Error('User not found')
         }
@@ -54,7 +54,7 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
     },
     checkIn: {
       async count(args: any) {
-        return checkIns.filter(item => matchWhere(item, args.where)).length
+        return checkIns.filter((item) => matchWhere(item, args.where)).length
       },
       async create(args: any) {
         const record = {
@@ -67,27 +67,26 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
         return record
       },
       async findMany(args: any) {
-        let records = checkIns.filter(item => matchWhere(item, args.where || {}))
+        let records = checkIns.filter((item) => matchWhere(item, args.where || {}))
         if (args.orderBy?.checkedAt === 'desc') {
           records = records.sort((a, b) => b.checkedAt.getTime() - a.checkedAt.getTime())
-        }
-        else if (args.orderBy?.checkedAt === 'asc') {
+        } else if (args.orderBy?.checkedAt === 'asc') {
           records = records.sort((a, b) => a.checkedAt.getTime() - b.checkedAt.getTime())
         }
         return typeof args.take === 'number' ? records.slice(0, args.take) : records
       },
       async findFirst(args: any) {
-        return checkIns.find(item => matchWhere(item, args.where)) || null
+        return checkIns.find((item) => matchWhere(item, args.where)) || null
       },
       async delete(args: any) {
-        const index = checkIns.findIndex(item => item.id === args.where.id)
+        const index = checkIns.findIndex((item) => item.id === args.where.id)
         const [record] = checkIns.splice(index, 1)
         return record
       },
     },
     weightRecord: {
       async count(args: any) {
-        return weightRecords.filter(item => matchWeightWhere(item, args.where || {})).length
+        return weightRecords.filter((item) => matchWeightWhere(item, args.where || {})).length
       },
       async create(args: any) {
         const record: AppWeightRecord = {
@@ -102,13 +101,11 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
         return record
       },
       async findMany(args: any) {
-        let records = weightRecords.filter(item => matchWeightWhere(item, args.where || {}))
+        let records = weightRecords.filter((item) => matchWeightWhere(item, args.where || {}))
         const measuredAtOrder = Array.isArray(args.orderBy)
           ? args.orderBy.find((item: any) => item.measuredAt)?.measuredAt
           : args.orderBy?.measuredAt
-        const idOrder = Array.isArray(args.orderBy)
-          ? args.orderBy.find((item: any) => item.id)?.id
-          : args.orderBy?.id
+        const idOrder = Array.isArray(args.orderBy) ? args.orderBy.find((item: any) => item.id)?.id : args.orderBy?.id
         records = [...records].sort((a, b) => {
           const timeDiff = a.measuredAt.getTime() - b.measuredAt.getTime()
           if (timeDiff !== 0) {
@@ -121,10 +118,10 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
         return typeof args.take === 'number' ? records.slice(start, start + args.take) : records.slice(start)
       },
       async findFirst(args: any) {
-        return weightRecords.find(item => matchWeightWhere(item, args.where || {})) || null
+        return weightRecords.find((item) => matchWeightWhere(item, args.where || {})) || null
       },
       async update(args: any) {
-        const record = weightRecords.find(item => item.id === args.where.id)
+        const record = weightRecords.find((item) => item.id === args.where.id)
         if (!record) {
           throw new Error('Weight record not found')
         }
@@ -132,7 +129,7 @@ function createMemoryDb(): AppDb & { users: AppUser[], checkIns: AppCheckIn[], w
         return record
       },
       async delete(args: any) {
-        const index = weightRecords.findIndex(item => item.id === args.where.id)
+        const index = weightRecords.findIndex((item) => item.id === args.where.id)
         const [record] = weightRecords.splice(index, 1)
         return record
       },
@@ -178,7 +175,7 @@ async function login(app: Awaited<ReturnType<typeof createApp>>, code = 'code-1'
     url: '/api/auth/wx-login',
     payload: { code },
   })
-  return response.json().data as { token: string, user: { userId: number } }
+  return response.json().data as { token: string; user: { userId: number } }
 }
 
 function checkInAtChinaDay(userId: number, dayOffset: number, id: number): AppCheckIn {
@@ -198,7 +195,7 @@ function multipartAvatarPayload() {
     Buffer.from(`--${boundary}\r\n`),
     Buffer.from('Content-Disposition: form-data; name="avatar"; filename="avatar.png"\r\n'),
     Buffer.from('Content-Type: image/png\r\n\r\n'),
-    Buffer.from([0x89, 0x50, 0x4E, 0x47]),
+    Buffer.from([0x89, 0x50, 0x4e, 0x47]),
     Buffer.from(`\r\n--${boundary}--\r\n`),
   ])
 
@@ -218,7 +215,7 @@ describe('fitness check-in api', () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
-      exchangeCode: async code => ({ openid: `openid-${code}` }),
+      exchangeCode: async (code) => ({ openid: `openid-${code}` }),
     })
 
     const response = await app.inject({
@@ -274,7 +271,7 @@ describe('fitness check-in api', () => {
       method: 'POST',
       url: '/api/checkins',
       headers: {
-        'authorization': `Bearer ${session.token}`,
+        authorization: `Bearer ${session.token}`,
         'content-type': 'application/json',
       },
       payload: '',
@@ -309,7 +306,7 @@ describe('fitness check-in api', () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
-      exchangeCode: async code => ({ openid: `openid-${code}` }),
+      exchangeCode: async (code) => ({ openid: `openid-${code}` }),
     })
     const first = await login(app, 'first')
     const second = await login(app, 'second')
@@ -354,10 +351,7 @@ describe('fitness check-in api', () => {
       exchangeCode: async () => ({ openid: 'openid-1' }),
     })
     const session = await login(app)
-    db.checkIns.push(
-      checkInAtChinaDay(session.user.userId, 0, 1),
-      checkInAtChinaDay(session.user.userId, 2, 2),
-    )
+    db.checkIns.push(checkInAtChinaDay(session.user.userId, 0, 1), checkInAtChinaDay(session.user.userId, 2, 2))
 
     const response = await app.inject({
       method: 'GET',
@@ -487,9 +481,9 @@ describe('fitness check-in api', () => {
       method: 'POST',
       url: '/api/user/avatar',
       headers: {
-        'authorization': `Bearer ${session.token}`,
+        authorization: `Bearer ${session.token}`,
         'content-type': `multipart/form-data; boundary=${boundary}`,
-        'host': 'api.example.com',
+        host: 'api.example.com',
         'x-forwarded-proto': 'https',
       },
       payload,
@@ -655,7 +649,7 @@ describe('fitness check-in api', () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
-      exchangeCode: async code => ({ openid: `openid-${code}` }),
+      exchangeCode: async (code) => ({ openid: `openid-${code}` }),
     })
     const owner = await login(app, 'owner')
     const other = await login(app, 'other')

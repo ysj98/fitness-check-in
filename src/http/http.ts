@@ -49,11 +49,19 @@ export function httpGet<T>(url: string, query?: Record<string, unknown>, options
   return http<T>({ url, query, method: 'GET', ...options })
 }
 
-export function httpPost<T>(url: string, data?: UniApp.RequestOptions['data'], options: Partial<CustomRequestOptions> = {}) {
+export function httpPost<T>(
+  url: string,
+  data?: UniApp.RequestOptions['data'],
+  options: Partial<CustomRequestOptions> = {},
+) {
   return http<T>({ url, data, method: 'POST', ...options })
 }
 
-export function httpDelete<T>(url: string, query?: Record<string, unknown>, options: Partial<CustomRequestOptions> = {}) {
+export function httpDelete<T>(
+  url: string,
+  query?: Record<string, unknown>,
+  options: Partial<CustomRequestOptions> = {},
+) {
   return http<T>({ url, query, method: 'DELETE', ...options })
 }
 

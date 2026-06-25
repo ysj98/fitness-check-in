@@ -1,12 +1,15 @@
 <script lang="ts" setup>
-withDefaults(defineProps<{
-  title: string
-  saving?: boolean
-  saveText?: string
-}>(), {
-  saving: false,
-  saveText: '保存',
-})
+withDefaults(
+  defineProps<{
+    title: string
+    saving?: boolean
+    saveText?: string
+  }>(),
+  {
+    saving: false,
+    saveText: '保存',
+  },
+)
 
 defineEmits<{
   close: []
@@ -19,9 +22,7 @@ defineEmits<{
     <view class="app-sheet">
       <view class="sheet-grabber" />
       <view class="sheet-head">
-        <button class="toolbar-button" @click="$emit('close')">
-          取消
-        </button>
+        <button class="toolbar-button" @click="$emit('close')">取消</button>
         <text class="sheet-title">{{ title }}</text>
         <button class="toolbar-button primary" :disabled="saving" @click="$emit('save')">
           {{ saving ? '保存中' : saveText }}

@@ -1,30 +1,29 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 
-const props = withDefaults(defineProps<{
-  name: string
-  accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'purple' | 'red'
-  size?: 'sm' | 'md' | 'lg'
-  active?: boolean
-  muted?: boolean
-  label?: string
-}>(), {
-  accent: 'green',
-  size: 'md',
-  active: false,
-  muted: false,
-  label: '',
-})
+const props = withDefaults(
+  defineProps<{
+    name: string
+    accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'purple' | 'red'
+    size?: 'sm' | 'md' | 'lg'
+    active?: boolean
+    muted?: boolean
+    label?: string
+  }>(),
+  {
+    accent: 'green',
+    size: 'md',
+    active: false,
+    muted: false,
+    label: '',
+  },
+)
 
-const iconClass = computed(() => props.name.startsWith('i-') ? props.name : `i-fit-${props.name}`)
+const iconClass = computed(() => (props.name.startsWith('i-') ? props.name : `i-fit-${props.name}`))
 </script>
 
 <template>
-  <view
-    class="app-icon"
-    :class="[`accent-${accent}`, `size-${size}`, { active, muted }]"
-    :aria-label="label || name"
-  >
+  <view class="app-icon" :class="[`accent-${accent}`, `size-${size}`, { active, muted }]" :aria-label="label || name">
     <text class="app-icon-glyph" :class="iconClass" />
   </view>
 </template>

@@ -1,0 +1,9 @@
+dist
+node_modules
+auto-import.d.ts
+uni-pages.d.ts
+src/pages.json
+src/manifest.json
+src/components/qiun-*/**
+server/release
+pnpm-lock.yaml

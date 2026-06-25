@@ -9,7 +9,8 @@ function parseEnv(file) {
     return {}
   }
 
-  return fs.readFileSync(file, 'utf8')
+  return fs
+    .readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .reduce((env, line) => {
       const source = line.trim()
@@ -24,10 +25,7 @@ function parseEnv(file) {
 
       const key = source.slice(0, index).trim()
       let value = source.slice(index + 1).trim()
-      if (
-        (value.startsWith('"') && value.endsWith('"'))
-        || (value.startsWith('\'') && value.endsWith('\''))
-      ) {
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
         value = value.slice(1, -1)
       }
 
@@ -37,9 +35,7 @@ function parseEnv(file) {
 }
 
 const fileEnv = parseEnv(envFile)
-const host = !fileEnv.HOST || fileEnv.HOST === '0.0.0.0'
-  ? '127.0.0.1'
-  : fileEnv.HOST
+const host = !fileEnv.HOST || fileEnv.HOST === '0.0.0.0' ? '127.0.0.1' : fileEnv.HOST
 
 module.exports = {
   apps: [

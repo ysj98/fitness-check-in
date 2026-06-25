@@ -28,12 +28,8 @@ function clean() {
 }
 
 function runBuild() {
-  const command = process.env.npm_execpath
-    ? process.execPath
-    : process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
-  const args = process.env.npm_execpath
-    ? [process.env.npm_execpath, 'build']
-    : ['build']
+  const command = process.env.npm_execpath ? process.execPath : process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  const args = process.env.npm_execpath ? [process.env.npm_execpath, 'build'] : ['build']
 
   execFileSync(command, args, {
     cwd: rootDir,
@@ -80,17 +76,17 @@ const crcTable = new Uint32Array(256)
 for (let i = 0; i < 256; i += 1) {
   let value = i
   for (let bit = 0; bit < 8; bit += 1) {
-    value = value & 1 ? 0xEDB88320 ^ (value >>> 1) : value >>> 1
+    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1
   }
   crcTable[i] = value >>> 0
 }
 
 function crc32(buffer) {
-  let value = 0xFFFFFFFF
+  let value = 0xffffffff
   for (const byte of buffer) {
-    value = crcTable[(value ^ byte) & 0xFF] ^ (value >>> 8)
+    value = crcTable[(value ^ byte) & 0xff] ^ (value >>> 8)
   }
-  return (value ^ 0xFFFFFFFF) >>> 0
+  return (value ^ 0xffffffff) >>> 0
 }
 
 function dosDateTime(date) {
@@ -126,7 +122,7 @@ function createZip(sourceDir, targetZip) {
     const checksum = crc32(data)
 
     const localHeader = Buffer.concat([
-      writeUInt32(0x04034B50),
+      writeUInt32(0x04034b50),
       writeUInt16(20),
       writeUInt16(0),
       writeUInt16(0),
@@ -141,7 +137,7 @@ function createZip(sourceDir, targetZip) {
     ])
 
     const centralHeader = Buffer.concat([
-      writeUInt32(0x02014B50),
+      writeUInt32(0x02014b50),
       writeUInt16(20),
       writeUInt16(20),
       writeUInt16(0),
@@ -168,7 +164,7 @@ function createZip(sourceDir, targetZip) {
 
   const centralDirectory = Buffer.concat(centralParts)
   const endRecord = Buffer.concat([
-    writeUInt32(0x06054B50),
+    writeUInt32(0x06054b50),
     writeUInt16(0),
     writeUInt16(0),
     writeUInt16(files.length),

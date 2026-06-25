@@ -14,8 +14,7 @@ const httpInterceptor = {
       const queryStr = stringifyQuery(options.query)
       if (options.url.includes('?')) {
         options.url += `&${queryStr}`
-      }
-      else {
+      } else {
         options.url += `?${queryStr}`
       }
       delete options.query

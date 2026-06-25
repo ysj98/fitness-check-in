@@ -2,11 +2,7 @@ const CHINA_OFFSET_MS = 8 * 60 * 60 * 1000
 
 export function getChinaDayRange(date = new Date()) {
   const chinaDate = new Date(date.getTime() + CHINA_OFFSET_MS)
-  const start = Date.UTC(
-    chinaDate.getUTCFullYear(),
-    chinaDate.getUTCMonth(),
-    chinaDate.getUTCDate(),
-  ) - CHINA_OFFSET_MS
+  const start = Date.UTC(chinaDate.getUTCFullYear(), chinaDate.getUTCMonth(), chinaDate.getUTCDate()) - CHINA_OFFSET_MS
 
   return {
     start: new Date(start),

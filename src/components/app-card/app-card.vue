@@ -1,15 +1,18 @@
 <script lang="ts" setup>
-withDefaults(defineProps<{
-  accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
-  elevated?: boolean
-  interactive?: boolean
-  showAccent?: boolean
-}>(), {
-  accent: 'green',
-  elevated: false,
-  interactive: false,
-  showAccent: true,
-})
+withDefaults(
+  defineProps<{
+    accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
+    elevated?: boolean
+    interactive?: boolean
+    showAccent?: boolean
+  }>(),
+  {
+    accent: 'green',
+    elevated: false,
+    interactive: false,
+    showAccent: true,
+  },
+)
 </script>
 
 <template>

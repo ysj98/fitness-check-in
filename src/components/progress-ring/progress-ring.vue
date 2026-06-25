@@ -1,16 +1,19 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 
-const props = withDefaults(defineProps<{
-  percent: number
-  label?: string
-  accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
-  size?: 'md' | 'lg'
-}>(), {
-  label: '完成度',
-  accent: 'green',
-  size: 'md',
-})
+const props = withDefaults(
+  defineProps<{
+    percent: number
+    label?: string
+    accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
+    size?: 'md' | 'lg'
+  }>(),
+  {
+    label: '完成度',
+    accent: 'green',
+    size: 'md',
+  },
+)
 
 const normalized = computed(() => Math.max(0, Math.min(100, props.percent)))
 const ringStyle = computed(() => ({

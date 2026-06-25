@@ -1,10 +1,12 @@
 import { ref } from 'vue'
 import { tabbarItems } from './config'
 
-export const tabbarList = ref(tabbarItems.map(item => ({
-  ...item,
-  pagePath: normalizeRoutePath(item.pagePath),
-})))
+export const tabbarList = ref(
+  tabbarItems.map((item) => ({
+    ...item,
+    pagePath: normalizeRoutePath(item.pagePath),
+  })),
+)
 
 export function normalizeRoutePath(path = '') {
   const route = path.split('?')[0]
@@ -13,7 +15,7 @@ export function normalizeRoutePath(path = '') {
 
 export function isPageTabbar(path: string) {
   const route = normalizeRoutePath(path)
-  return route === '/' || tabbarList.value.some(item => item.pagePath === route)
+  return route === '/' || tabbarList.value.some((item) => item.pagePath === route)
 }
 
 function getCurrentPagePath() {
@@ -23,7 +25,7 @@ function getCurrentPagePath() {
 
 function findTabbarIndex(path: string) {
   const route = normalizeRoutePath(path)
-  return route === '/' ? 0 : tabbarList.value.findIndex(item => item.pagePath === route)
+  return route === '/' ? 0 : tabbarList.value.findIndex((item) => item.pagePath === route)
 }
 
 const storedIndex = Number(uni.getStorageSync('app-tabbar-index')) || 0

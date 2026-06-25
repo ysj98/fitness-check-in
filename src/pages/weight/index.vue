@@ -67,17 +67,23 @@ const settingsForm = reactive({
   weightUnit: 'kg' as WeightUnit,
 })
 
-const unitLabel = computed(() => stats.value.weightUnit === 'jin' ? '斤' : 'kg')
+const unitLabel = computed(() => (stats.value.weightUnit === 'jin' ? '斤' : 'kg'))
 const currentWeight = computed(() => displayWeight(stats.value.currentWeightKg))
 const targetWeight = computed(() => displayWeight(stats.value.targetWeightKg))
 const targetDistance = computed(() => displayWeight(stats.value.distanceToTargetKg))
 const canLoadMore = computed(() => records.value.length < total.value)
 const bmiReady = computed(() => Boolean(stats.value.heightCm))
 const hasTargetWeight = computed(() => {
-  return typeof stats.value.targetWeightKg === 'number' && Number.isFinite(stats.value.targetWeightKg) && stats.value.targetWeightKg > 0
+  return (
+    typeof stats.value.targetWeightKg === 'number' &&
+    Number.isFinite(stats.value.targetWeightKg) &&
+    stats.value.targetWeightKg > 0
+  )
 })
-const targetWeightValue = computed(() => hasTargetWeight.value ? targetWeight.value : '未设置')
-const targetDistanceValue = computed(() => stats.value.distanceToTargetKg === null || !hasTargetWeight.value ? '待计算' : targetDistance.value)
+const targetWeightValue = computed(() => (hasTargetWeight.value ? targetWeight.value : '未设置'))
+const targetDistanceValue = computed(() =>
+  stats.value.distanceToTargetKg === null || !hasTargetWeight.value ? '待计算' : targetDistance.value,
+)
 const bmiValue = computed(() => stats.value.bmi ?? '待计算')
 const bmiAccent = computed<MetricAccent>(() => {
   switch (stats.value.bmiCategory) {
@@ -152,13 +158,15 @@ const weightProgress = computed(() => {
   return Math.max(0, Math.min(100, Math.round(((startDistance - currentDistance) / startDistance) * 100)))
 })
 const chartData = computed(() => ({
-  categories: stats.value.trend.map(item => item.date.slice(5)),
-  series: [{
-    name: trendMetric.value === 'weight' ? `体重(${unitLabel.value})` : 'BMI',
-    data: stats.value.trend.map(item => trendMetric.value === 'weight'
-      ? fromWeightKg(item.weightKg, stats.value.weightUnit)
-      : item.bmi ?? 0),
-  }],
+  categories: stats.value.trend.map((item) => item.date.slice(5)),
+  series: [
+    {
+      name: trendMetric.value === 'weight' ? `体重(${unitLabel.value})` : 'BMI',
+      data: stats.value.trend.map((item) =>
+        trendMetric.value === 'weight' ? fromWeightKg(item.weightKg, stats.value.weightUnit) : (item.bmi ?? 0),
+      ),
+    },
+  ],
 }))
 const chartOpts = computed(() => ({
   color: [themeStore.isDark ? '#4aa3ff' : '#1688ff'],
@@ -175,11 +183,13 @@ const chartOpts = computed(() => ({
     gridType: 'dash',
     dashLength: 4,
     gridColor: themeStore.isDark ? '#20352d' : '#d8e8df',
-    data: [{
-      title: trendMetric.value === 'weight' ? unitLabel.value : 'BMI',
-      tofix: 1,
-      fontColor: themeStore.isDark ? '#a8b8b0' : '#7a8a82',
-    }],
+    data: [
+      {
+        title: trendMetric.value === 'weight' ? unitLabel.value : 'BMI',
+        tofix: 1,
+        fontColor: themeStore.isDark ? '#a8b8b0' : '#7a8a82',
+      },
+    ],
   },
   extra: {
     line: {
@@ -222,19 +232,14 @@ async function loadPage() {
   loadFailed.value = false
   try {
     await ensureLogin()
-    const [list, nextStats] = await Promise.all([
-      getWeights(1, pageSize),
-      getWeightStats(selectedDays.value),
-    ])
+    const [list, nextStats] = await Promise.all([getWeights(1, pageSize), getWeightStats(selectedDays.value)])
     records.value = list.items
     total.value = list.total
     page.value = 1
     stats.value = nextStats
-  }
-  catch {
+  } catch {
     loadFailed.value = true
-  }
-  finally {
+  } finally {
     loading.value = false
   }
 }
@@ -250,8 +255,7 @@ async function loadMore() {
     records.value = [...records.value, ...list.items]
     total.value = list.total
     page.value = nextPage
-  }
-  finally {
+  } finally {
     loading.value = false
   }
 }
@@ -275,9 +279,10 @@ function selectMetric(metric: TrendMetric) {
 function openCreateRecord() {
   editingRecord.value = null
   const now = getChinaDateTimeParts(new Date())
-  recordForm.weight = stats.value.currentWeightKg === null
-    ? ''
-    : String(fromWeightKg(stats.value.currentWeightKg, stats.value.weightUnit))
+  recordForm.weight =
+    stats.value.currentWeightKg === null
+      ? ''
+      : String(fromWeightKg(stats.value.currentWeightKg, stats.value.weightUnit))
   recordForm.date = now.date
   recordForm.time = now.time
   recordModalVisible.value = true
@@ -310,7 +315,10 @@ async function saveRecord() {
   const inputWeight = Number(recordForm.weight)
   const weightKg = toWeightKg(inputWeight, stats.value.weightUnit)
   if (!Number.isFinite(inputWeight) || weightKg < 20 || weightKg > 300) {
-    uni.showToast({ title: `请输入有效体重（${stats.value.weightUnit === 'jin' ? '40-600 斤' : '20-300 kg'}）`, icon: 'none' })
+    uni.showToast({
+      title: `请输入有效体重（${stats.value.weightUnit === 'jin' ? '40-600 斤' : '20-300 kg'}）`,
+      icon: 'none',
+    })
     return
   }
   const measuredAt = new Date(`${recordForm.date}T${recordForm.time}:00+08:00`)
@@ -324,8 +332,7 @@ async function saveRecord() {
     const payload = { weightKg, measuredAt: measuredAt.toISOString() }
     if (editingRecord.value) {
       await updateWeight(editingRecord.value.id, payload)
-    }
-    else {
+    } else {
       await createWeight(payload)
     }
     recordModalVisible.value = false
@@ -336,8 +343,7 @@ async function saveRecord() {
     setTimeout(() => {
       successPulse.value = false
     }, 360)
-  }
-  finally {
+  } finally {
     savingRecord.value = false
   }
 }
@@ -348,7 +354,7 @@ async function confirmDelete(record: WeightRecord) {
       title: '删除记录',
       content: `删除 ${formatDateTime(record.measuredAt)} 的体重记录？`,
       confirmColor: '#ff4d4f',
-      success: result => resolve(result.confirm),
+      success: (result) => resolve(result.confirm),
       fail: () => resolve(false),
     })
   })
@@ -361,10 +367,7 @@ async function confirmDelete(record: WeightRecord) {
 }
 
 async function refreshWeightData() {
-  const [list, nextStats] = await Promise.all([
-    getWeights(1, pageSize),
-    getWeightStats(selectedDays.value),
-  ])
+  const [list, nextStats] = await Promise.all([getWeights(1, pageSize), getWeightStats(selectedDays.value)])
   records.value = list.items
   total.value = list.total
   page.value = 1
@@ -373,9 +376,8 @@ async function refreshWeightData() {
 
 function openSettings() {
   settingsForm.heightCm = stats.value.heightCm === null ? '' : String(stats.value.heightCm)
-  settingsForm.targetWeight = stats.value.targetWeightKg === null
-    ? ''
-    : String(fromWeightKg(stats.value.targetWeightKg, stats.value.weightUnit))
+  settingsForm.targetWeight =
+    stats.value.targetWeightKg === null ? '' : String(fromWeightKg(stats.value.targetWeightKg, stats.value.weightUnit))
   settingsForm.weightUnit = stats.value.weightUnit
   settingsModalVisible.value = true
 }
@@ -422,8 +424,7 @@ async function saveSettings() {
     settingsModalVisible.value = false
     await refreshWeightData()
     uni.showToast({ title: '设置已保存', icon: 'success' })
-  }
-  finally {
+  } finally {
     savingSettings.value = false
   }
 }
@@ -460,9 +461,7 @@ function getChinaDateTimeParts(date: Date) {
     <view v-if="loadFailed" class="state-panel">
       <app-icon name="weight" accent="blue" size="lg" />
       <text>加载失败</text>
-      <app-button accent="blue" variant="soft" @click="loadPage">
-        重新加载
-      </app-button>
+      <app-button accent="blue" variant="soft" @click="loadPage"> 重新加载 </app-button>
     </view>
 
     <template v-else>
@@ -537,9 +536,7 @@ function getChinaDateTimeParts(date: Date) {
       </view>
 
       <view class="record-button-shell">
-        <app-button icon="weight" accent="green" @click="openCreateRecord">
-          记录体重
-        </app-button>
+        <app-button icon="weight" accent="green" @click="openCreateRecord"> 记录体重 </app-button>
       </view>
 
       <text class="ios-section-title">数据趋势</text>
@@ -549,22 +546,27 @@ function getChinaDateTimeParts(date: Date) {
             <view class="section-head">
               <text class="section-title">趋势</text>
               <view class="metric-control">
-                <app-segmented-control :model-value="trendMetric" :options="metricOptions.map(item => ({ ...item, disabled: item.value === 'bmi' && !bmiReady }))" @change="selectMetric" />
+                <app-segmented-control
+                  :model-value="trendMetric"
+                  :options="metricOptions.map((item) => ({ ...item, disabled: item.value === 'bmi' && !bmiReady }))"
+                  @change="selectMetric"
+                />
               </view>
             </view>
-            <app-segmented-control class="range-switch" :model-value="selectedDays" :options="rangeOptions" @change="selectDays" />
-            <view v-if="loading && stats.trend.length === 0" class="chart-loading">
-              加载中
-            </view>
+            <app-segmented-control
+              class="range-switch"
+              :model-value="selectedDays"
+              :options="rangeOptions"
+              @change="selectDays"
+            />
+            <view v-if="loading && stats.trend.length === 0" class="chart-loading"> 加载中 </view>
             <view v-else-if="stats.trend.length < 3" class="chart-empty compact">
               {{ trendEmptyText }}
             </view>
             <view v-else-if="!recordModalVisible && !settingsModalVisible" class="chart-box">
               <qiun-data-charts type="line" :opts="chartOpts" :chart-data="chartData" :canvas2d="true" />
             </view>
-            <view v-else class="chart-empty">
-              图表已暂时隐藏
-            </view>
+            <view v-else class="chart-empty"> 图表已暂时隐藏 </view>
           </view>
         </app-card>
       </view>
@@ -582,10 +584,17 @@ function getChinaDateTimeParts(date: Date) {
               <text>暂无体重记录</text>
             </view>
             <view v-else class="record-list">
-              <view v-for="(record, index) in records" :key="record.id" class="record-item" :style="{ animationDelay: `${Math.min(index, 8) * 30}ms` }">
+              <view
+                v-for="(record, index) in records"
+                :key="record.id"
+                class="record-item"
+                :style="{ animationDelay: `${Math.min(index, 8) * 30}ms` }"
+              >
                 <app-icon name="weight" accent="blue" size="sm" />
                 <view class="record-data">
-                  <text class="record-weight numeric">{{ fromWeightKg(record.weightKg, stats.weightUnit).toFixed(1) }} {{ unitLabel }}</text>
+                  <text class="record-weight numeric"
+                    >{{ fromWeightKg(record.weightKg, stats.weightUnit).toFixed(1) }} {{ unitLabel }}</text
+                  >
                   <text class="record-date">{{ formatDateTime(record.measuredAt) }}</text>
                 </view>
                 <view class="record-bmi">
@@ -605,9 +614,7 @@ function getChinaDateTimeParts(date: Date) {
             <button v-if="canLoadMore" class="load-more" :disabled="loading" @click="loadMore">
               {{ loading ? '加载中' : '加载更多' }}
             </button>
-            <view v-else-if="records.length > 0" class="list-end">
-              已显示全部记录
-            </view>
+            <view v-else-if="records.length > 0" class="list-end"> 已显示全部记录 </view>
           </view>
         </app-card>
       </view>
@@ -621,7 +628,7 @@ function getChinaDateTimeParts(date: Date) {
       @save="saveRecord"
     >
       <view class="weight-input-row">
-        <input v-model="recordForm.weight" class="weight-input" type="digit" :maxlength="6" focus placeholder="0.0">
+        <input v-model="recordForm.weight" class="weight-input" type="digit" :maxlength="6" focus placeholder="0.0" />
         <text>{{ unitLabel }}</text>
       </view>
       <view class="form-group">
@@ -655,20 +662,24 @@ function getChinaDateTimeParts(date: Date) {
         <view class="form-row input-form-row">
           <text class="form-label">身高</text>
           <view class="inline-input">
-            <input v-model="settingsForm.heightCm" type="digit" :maxlength="5" placeholder="未设置">
+            <input v-model="settingsForm.heightCm" type="digit" :maxlength="5" placeholder="未设置" />
             <text>cm</text>
           </view>
         </view>
         <view class="form-row input-form-row">
           <text class="form-label">目标体重</text>
           <view class="inline-input">
-            <input v-model="settingsForm.targetWeight" type="digit" :maxlength="6" placeholder="未设置">
+            <input v-model="settingsForm.targetWeight" type="digit" :maxlength="6" placeholder="未设置" />
             <text>{{ settingsForm.weightUnit === 'jin' ? '斤' : 'kg' }}</text>
           </view>
         </view>
         <view class="form-row unit-row">
           <text class="form-label">显示单位</text>
-          <app-segmented-control :model-value="settingsForm.weightUnit" :options="unitOptions" @change="selectSettingsUnit" />
+          <app-segmented-control
+            :model-value="settingsForm.weightUnit"
+            :options="unitOptions"
+            @change="selectSettingsUnit"
+          />
         </view>
       </view>
     </app-sheet>

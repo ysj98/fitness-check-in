@@ -43,8 +43,7 @@ export function uploadUserAvatar(filePath: string) {
             return
           }
           reject(new Error(response.message || response.msg || '头像上传失败'))
-        }
-        catch (error) {
+        } catch (error) {
           reject(error)
         }
       },
@@ -57,8 +56,8 @@ export function getWxCode() {
   return new Promise<string>((resolve, reject) => {
     uni.login({
       provider: 'weixin',
-      success: res => res.code ? resolve(res.code) : reject(new Error('未获取到微信登录凭证')),
-      fail: err => reject(new Error(err.errMsg || '微信登录失败')),
+      success: (res) => (res.code ? resolve(res.code) : reject(new Error('未获取到微信登录凭证'))),
+      fail: (err) => reject(new Error(err.errMsg || '微信登录失败')),
     })
   })
 }

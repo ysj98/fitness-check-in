@@ -43,12 +43,10 @@ export const useTokenStore = defineStore(
           const result = await requestWxLogin(code)
           setAuth(result)
           return result
-        }
-        catch (error) {
+        } catch (error) {
           uni.showToast({ title: '微信登录失败，请重试', icon: 'none' })
           throw error
-        }
-        finally {
+        } finally {
           loginTask = null
         }
       })()

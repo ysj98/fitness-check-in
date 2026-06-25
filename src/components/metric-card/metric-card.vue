@@ -1,19 +1,22 @@
 <script lang="ts" setup>
-withDefaults(defineProps<{
-  label: string
-  value: string | number
-  note?: string
-  icon?: string
-  accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'red'
-  mutedValue?: boolean
-  noteEmphasis?: boolean
-}>(), {
-  note: '',
-  icon: '',
-  accent: 'green',
-  mutedValue: false,
-  noteEmphasis: false,
-})
+withDefaults(
+  defineProps<{
+    label: string
+    value: string | number
+    note?: string
+    icon?: string
+    accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'red'
+    mutedValue?: boolean
+    noteEmphasis?: boolean
+  }>(),
+  {
+    note: '',
+    icon: '',
+    accent: 'green',
+    mutedValue: false,
+    noteEmphasis: false,
+  },
+)
 </script>
 
 <template>

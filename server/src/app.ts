@@ -58,7 +58,7 @@ const weightListQuerySchema = z.object({
 })
 
 const weightStatsQuerySchema = z.object({
-  days: z.coerce.number().refine(value => [7, 30, 90].includes(value), 'days must be 7, 30 or 90'),
+  days: z.coerce.number().refine((value) => [7, 30, 90].includes(value), 'days must be 7, 30 or 90'),
 })
 
 const weightSettingsSchema = z.object({
@@ -71,7 +71,11 @@ const profileSchema = z.object({
   nickname: z.string().trim().min(1).max(30),
   avatarUrl: z.string().trim().max(500).optional().nullable(),
   gender: z.enum(['male', 'female', 'other']).optional().nullable(),
-  birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  birthday: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
   dailyGoal: z.coerce.number().int().min(1).max(9).optional(),
   heightCm: heightValueSchema.optional().nullable(),
 })
@@ -97,7 +101,7 @@ function calculateRawBmi(weightKg: number, heightCm: number | null) {
   if (!heightCm) {
     return null
   }
-  return weightKg / ((heightCm / 100) ** 2)
+  return weightKg / (heightCm / 100) ** 2
 }
 
 function calculateBmi(weightKg: number, heightCm: number | null) {
@@ -141,7 +145,10 @@ function parseMeasuredAt(value: string) {
   return measuredAt
 }
 
-function serializeWeightRecord(record: Awaited<ReturnType<AppDb['weightRecord']['findFirst']>>, heightCm: number | null) {
+function serializeWeightRecord(
+  record: Awaited<ReturnType<AppDb['weightRecord']['findFirst']>>,
+  heightCm: number | null,
+) {
   if (!record) {
     return null
   }
@@ -154,7 +161,7 @@ function serializeWeightRecord(record: Awaited<ReturnType<AppDb['weightRecord'][
   }
 }
 
-function buildBadges(params: { currentStreak: number, totalCount: number, todayCompleted: boolean }) {
+function buildBadges(params: { currentStreak: number; totalCount: number; todayCompleted: boolean }) {
   const { currentStreak, totalCount, todayCompleted } = params
 
   return [
@@ -198,7 +205,7 @@ function buildBadges(params: { currentStreak: number, totalCount: number, todayC
 }
 
 function calculateCurrentStreak(records: AppCheckIn[]) {
-  const checkedDateSet = new Set(records.map(record => formatChinaDate(record.checkedAt)))
+  const checkedDateSet = new Set(records.map((record) => formatChinaDate(record.checkedAt)))
   let currentStreak = 0
   let cursor = getChinaDayRange().start
 
@@ -270,15 +277,11 @@ function buildAchievements(params: {
   const currentStreak = calculateCurrentStreak(checkIns)
   const dailyGoal = user.dailyGoal || 1
   const todayRange = getChinaDayRange()
-  const todayCount = checkIns.filter(record => record.checkedAt >= todayRange.start && record.checkedAt < todayRange.end).length
+  const todayCount = checkIns.filter(
+    (record) => record.checkedAt >= todayRange.start && record.checkedAt < todayRange.end,
+  ).length
   const goalStreak = calculateGoalStreak(checkIns, dailyGoal)
-  const profileFields = [
-    user.nickname,
-    user.avatarUrl,
-    user.gender,
-    user.birthday,
-    toNumber(user.heightCm),
-  ]
+  const profileFields = [user.nickname, user.avatarUrl, user.gender, user.birthday, toNumber(user.heightCm)]
   const profileCompleted = profileFields.filter(Boolean).length
   const hasTargetWeight = toNumber(user.targetWeightKg) !== null ? 1 : 0
 
@@ -601,8 +604,7 @@ export async function createApp(options: CreateAppOptions) {
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
     try {
       done(null, body === '' ? {} : JSON.parse(body as string))
-    }
-    catch (error) {
+    } catch (error) {
       done(error as Error)
     }
   })
@@ -617,7 +619,8 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.setErrorHandler((error, _request, reply) => {
-    const statusCode = error instanceof ZodError ? 400 : error.statusCode && error.statusCode >= 400 ? error.statusCode : 500
+    const statusCode =
+      error instanceof ZodError ? 400 : error.statusCode && error.statusCode >= 400 ? error.statusCode : 500
     reply.code(statusCode).send(fail(error.message || 'Server error', statusCode))
   })
 
@@ -643,11 +646,13 @@ export async function createApp(options: CreateAppOptions) {
     })
 
     const token = app.jwt.sign({ userId: user.id }, { expiresIn: '30d' })
-    reply.send(ok({
-      token,
-      expiresIn: 30 * 24 * 60 * 60,
-      user: serializeUser(user),
-    }))
+    reply.send(
+      ok({
+        token,
+        expiresIn: 30 * 24 * 60 * 60,
+        user: serializeUser(user),
+      }),
+    )
   })
 
   app.get('/api/user/info', async (request) => {
@@ -717,9 +722,9 @@ export async function createApp(options: CreateAppOptions) {
 
   app.addHook('preHandler', async (request) => {
     if (
-      request.routeOptions.url?.startsWith('/api/checkins')
-      || request.routeOptions.url?.startsWith('/api/weights')
-      || request.routeOptions.url?.startsWith('/api/achievements')
+      request.routeOptions.url?.startsWith('/api/checkins') ||
+      request.routeOptions.url?.startsWith('/api/weights') ||
+      request.routeOptions.url?.startsWith('/api/achievements')
     ) {
       await requireAuth(request)
     }
@@ -759,7 +764,7 @@ export async function createApp(options: CreateAppOptions) {
     ])
 
     return ok({
-      items: records.map(record => serializeWeightRecord(record, heightCm)),
+      items: records.map((record) => serializeWeightRecord(record, heightCm)),
       total,
       page: query.page,
       pageSize: query.pageSize,
@@ -816,13 +821,11 @@ export async function createApp(options: CreateAppOptions) {
       days: query.days,
       currentWeightKg,
       previousWeightKg,
-      changeKg: currentWeightKg !== null && previousWeightKg !== null
-        ? round(currentWeightKg - previousWeightKg)
-        : null,
+      changeKg:
+        currentWeightKg !== null && previousWeightKg !== null ? round(currentWeightKg - previousWeightKg) : null,
       targetWeightKg,
-      distanceToTargetKg: currentWeightKg !== null && targetWeightKg !== null
-        ? round(Math.abs(currentWeightKg - targetWeightKg))
-        : null,
+      distanceToTargetKg:
+        currentWeightKg !== null && targetWeightKg !== null ? round(Math.abs(currentWeightKg - targetWeightKg)) : null,
       heightCm,
       weightUnit: user.weightUnit || 'kg',
       bmi,
@@ -896,7 +899,7 @@ export async function createApp(options: CreateAppOptions) {
 
     return ok({
       count,
-      records: records.map(record => ({
+      records: records.map((record) => ({
         id: record.id,
         checkedAt: record.checkedAt.toISOString(),
       })),
@@ -911,10 +914,13 @@ export async function createApp(options: CreateAppOptions) {
       },
     })
 
-    return ok({
-      id: record.id,
-      checkedAt: record.checkedAt.toISOString(),
-    }, '打卡成功')
+    return ok(
+      {
+        id: record.id,
+        checkedAt: record.checkedAt.toISOString(),
+      },
+      '打卡成功',
+    )
   })
 
   app.get('/api/checkins/recent', async (request) => {
@@ -925,10 +931,12 @@ export async function createApp(options: CreateAppOptions) {
       take: query.limit,
     })
 
-    return ok(records.map(record => ({
-      id: record.id,
-      checkedAt: record.checkedAt.toISOString(),
-    })))
+    return ok(
+      records.map((record) => ({
+        id: record.id,
+        checkedAt: record.checkedAt.toISOString(),
+      })),
+    )
   })
 
   app.get('/api/checkins/month', async (request) => {

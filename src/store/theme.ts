@@ -6,8 +6,7 @@ export type ThemeMode = 'light' | 'dark'
 function getInitialTheme(): ThemeMode {
   try {
     return uni.getSystemInfoSync().theme === 'dark' ? 'dark' : 'light'
-  }
-  catch {
+  } catch {
     return 'light'
   }
 }

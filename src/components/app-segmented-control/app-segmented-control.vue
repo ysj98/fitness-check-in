@@ -1,12 +1,12 @@
 <script lang="ts" setup generic="T extends string | number">
 defineProps<{
   modelValue: T
-  options: { label: string, value: T, disabled?: boolean }[]
+  options: { label: string; value: T; disabled?: boolean }[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: T]
-  'change': [value: T]
+  change: [value: T]
 }>()
 
 function select(value: T, disabled?: boolean) {

@@ -1,9 +1,5 @@
 <script lang="ts" setup>
-import type {
-  CheckInRecord,
-  CheckInStatsRes,
-  MonthCheckInRes,
-} from "@/api/checkins";
+import type { CheckInRecord, CheckInStatsRes, MonthCheckInRes } from '@/api/checkins'
 import {
   createCheckIn,
   deleteCheckIn,
@@ -11,34 +7,34 @@ import {
   getMonthCheckIns,
   getRecentCheckIns,
   getTodayCheckIns,
-} from "@/api/checkins";
-import { useTokenStore } from "@/store";
-import { triggerSuccessHaptic } from "@/utils/haptics";
+} from '@/api/checkins'
+import { useTokenStore } from '@/store'
+import { triggerSuccessHaptic } from '@/utils/haptics'
 
 defineOptions({
-  name: "Home",
-});
+  name: 'Home',
+})
 
 definePage({
-  type: "home",
+  type: 'home',
   style: {
-    navigationStyle: "custom",
-    navigationBarTitleText: "运动打卡",
+    navigationStyle: 'custom',
+    navigationBarTitleText: '运动打卡',
   },
-});
+})
 
 interface CalendarDay {
-  key: string;
-  day: number;
-  count: number;
-  isToday: boolean;
+  key: string
+  day: number
+  count: number
+  isToday: boolean
 }
 
 interface RecentDaySummary {
-  key: string;
-  label: string;
-  count: number;
-  isToday: boolean;
+  key: string
+  label: string
+  count: number
+  isToday: boolean
 }
 
 const emptyStats: CheckInStatsRes = {
@@ -47,145 +43,137 @@ const emptyStats: CheckInStatsRes = {
   todayGoal: 1,
   todayCompleted: false,
   badges: [],
-};
+}
 
-const tokenStore = useTokenStore();
-const loading = ref(false);
-const checking = ref(false);
-const loginReady = ref(false);
-const successPulse = ref(false);
-const pageReady = ref(false);
-const selectedMonth = ref(new Date());
-const selectedDateKey = ref(formatDateKey(new Date()));
-const recentExpanded = ref(false);
-const activeRecordActionId = ref<number | null>(null);
-const todayCount = ref(0);
-const todayRecords = ref<CheckInRecord[]>([]);
-const recentRecords = ref<CheckInRecord[]>([]);
-const monthStats = ref<MonthCheckInRes>({ month: getMonthKey(), days: {} });
-const checkInStats = ref<CheckInStatsRes>({ ...emptyStats });
-const weekLabels = ["一", "二", "三", "四", "五", "六", "日"];
+const tokenStore = useTokenStore()
+const loading = ref(false)
+const checking = ref(false)
+const loginReady = ref(false)
+const successPulse = ref(false)
+const pageReady = ref(false)
+const selectedMonth = ref(new Date())
+const selectedDateKey = ref(formatDateKey(new Date()))
+const recentExpanded = ref(false)
+const activeRecordActionId = ref<number | null>(null)
+const todayCount = ref(0)
+const todayRecords = ref<CheckInRecord[]>([])
+const recentRecords = ref<CheckInRecord[]>([])
+const monthStats = ref<MonthCheckInRes>({ month: getMonthKey(), days: {} })
+const checkInStats = ref<CheckInStatsRes>({ ...emptyStats })
+const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
 
 const todayLabel = computed(() => {
-  const date = new Date();
-  const weekMap = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekMap[date.getDay()]}`;
-});
+  const date = new Date()
+  const weekMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekMap[date.getDay()]}`
+})
 
-const monthKey = computed(() => getMonthKey(selectedMonth.value));
+const monthKey = computed(() => getMonthKey(selectedMonth.value))
 const monthTitle = computed(() => {
-  const [year, month] = monthStats.value.month.split("-");
-  return `${year}年${Number(month)}月`;
-});
+  const [year, month] = monthStats.value.month.split('-')
+  return `${year}年${Number(month)}月`
+})
 
 const calendarDays = computed<CalendarDay[]>(() => {
-  const [year, month] = monthStats.value.month.split("-").map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const todayKey = formatDateKey(new Date());
+  const [year, month] = monthStats.value.month.split('-').map(Number)
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const todayKey = formatDateKey(new Date())
 
   return Array.from({ length: daysInMonth }, (_, index) => {
-    const day = index + 1;
-    const key = `${year}-${pad(month)}-${pad(day)}`;
+    const day = index + 1
+    const key = `${year}-${pad(month)}-${pad(day)}`
     return {
       key,
       day,
       count: monthStats.value.days[key] || 0,
       isToday: key === todayKey,
-    };
-  });
-});
+    }
+  })
+})
 
 const calendarStartOffset = computed(() => {
-  const [year, month] = monthStats.value.month.split("-").map(Number);
-  const day = new Date(year, month - 1, 1).getDay();
-  return day === 0 ? 6 : day - 1;
-});
+  const [year, month] = monthStats.value.month.split('-').map(Number)
+  const day = new Date(year, month - 1, 1).getDay()
+  return day === 0 ? 6 : day - 1
+})
 
 const goalText = computed(() => {
-  const goal = checkInStats.value.todayGoal || 1;
-  return `已完成 ${Math.min(todayCount.value, goal)}/${goal}`;
-});
+  const goal = checkInStats.value.todayGoal || 1
+  return `已完成 ${Math.min(todayCount.value, goal)}/${goal}`
+})
 
 const checkInButtonText = computed(() => {
   if (checking.value) {
-    return "打卡中...";
+    return '打卡中...'
   }
   if (successPulse.value) {
-    return "打卡成功";
+    return '打卡成功'
   }
-  return checkInStats.value.todayCompleted ? "继续打卡" : "立即打卡";
-});
+  return checkInStats.value.todayCompleted ? '继续打卡' : '立即打卡'
+})
 
 const checkInSummaryText = computed(() => {
-  return `今天已打卡 ${todayCount.value} 次，连续坚持 ${checkInStats.value.currentStreak} 天`;
-});
+  return `今天已打卡 ${todayCount.value} 次，连续坚持 ${checkInStats.value.currentStreak} 天`
+})
 
 const recentDaySummaries = computed<RecentDaySummary[]>(() => {
-  const countMap = recentRecords.value.reduce<Record<string, number>>(
-    (result, record) => {
-      const key = formatDateKey(new Date(record.checkedAt));
-      result[key] = (result[key] || 0) + 1;
-      return result;
-    },
-    {},
-  );
-  const today = new Date();
+  const countMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
+    const key = formatDateKey(new Date(record.checkedAt))
+    result[key] = (result[key] || 0) + 1
+    return result
+  }, {})
+  const today = new Date()
 
   return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - index);
-    const key = formatDateKey(date);
+    const date = new Date(today)
+    date.setDate(today.getDate() - index)
+    const key = formatDateKey(date)
     return {
       key,
-      label:
-        index === 0
-          ? "今天"
-          : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
+      label: index === 0 ? '今天' : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
       count: countMap[key] || 0,
       isToday: index === 0,
-    };
-  });
-});
+    }
+  })
+})
 
 const visibleRecentDaySummaries = computed(() => {
-  return recentExpanded.value
-    ? recentDaySummaries.value
-    : recentDaySummaries.value.slice(0, 3);
-});
+  return recentExpanded.value ? recentDaySummaries.value : recentDaySummaries.value.slice(0, 3)
+})
 
 onLoad(() => {
-  initPage();
+  initPage()
   setTimeout(() => {
-    pageReady.value = true;
-  }, 40);
-});
+    pageReady.value = true
+  }, 40)
+})
 
 onShow(() => {
   if (loginReady.value) {
-    loadDashboard();
+    loadDashboard()
   }
-});
+})
 
 async function initPage() {
-  loading.value = true;
+  loading.value = true
   try {
-    await ensureLogin();
-    await loadDashboard();
+    await ensureLogin()
+    await loadDashboard()
   } catch {
-    uni.showToast({ title: "数据加载失败，请重试", icon: "none" });
+    uni.showToast({ title: '数据加载失败，请重试', icon: 'none' })
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
 async function ensureLogin() {
   if (tokenStore.hasLogin()) {
-    loginReady.value = true;
-    return;
+    loginReady.value = true
+    return
   }
 
-  await tokenStore.wxLogin();
-  loginReady.value = true;
+  await tokenStore.wxLogin()
+  loginReady.value = true
 }
 
 async function loadDashboard() {
@@ -194,128 +182,113 @@ async function loadDashboard() {
     getRecentCheckIns(100),
     getMonthCheckIns(monthKey.value),
     getCheckInStats(),
-  ]);
+  ])
 
-  todayCount.value = today.count;
-  todayRecords.value = today.records;
-  recentRecords.value = recent;
-  monthStats.value = month;
-  checkInStats.value = stats;
+  todayCount.value = today.count
+  todayRecords.value = today.records
+  recentRecords.value = recent
+  monthStats.value = month
+  checkInStats.value = stats
 }
 
 async function loadMonth() {
-  monthStats.value = await getMonthCheckIns(monthKey.value);
+  monthStats.value = await getMonthCheckIns(monthKey.value)
 }
 
 async function changeMonth(offset: number) {
-  const current = selectedMonth.value;
-  selectedMonth.value = new Date(
-    current.getFullYear(),
-    current.getMonth() + offset,
-    1,
-  );
-  await loadMonth();
+  const current = selectedMonth.value
+  selectedMonth.value = new Date(current.getFullYear(), current.getMonth() + offset, 1)
+  await loadMonth()
 }
 
 async function backToCurrentMonth() {
-  selectedMonth.value = new Date();
-  await loadMonth();
+  selectedMonth.value = new Date()
+  await loadMonth()
 }
 
 async function handleCheckIn() {
   if (checking.value) {
-    return;
+    return
   }
 
-  checking.value = true;
+  checking.value = true
   try {
-    await ensureLogin();
-    const record = await createCheckIn();
-    successPulse.value = false;
-    await nextTick();
-    successPulse.value = true;
-    todayCount.value += 1;
-    todayRecords.value = [record, ...todayRecords.value];
-    recentRecords.value = [record, ...recentRecords.value].slice(0, 100);
-    const [month, stats] = await Promise.all([
-      getMonthCheckIns(monthKey.value),
-      getCheckInStats(),
-    ]);
-    monthStats.value = month;
-    checkInStats.value = stats;
-    triggerSuccessHaptic();
+    await ensureLogin()
+    const record = await createCheckIn()
+    successPulse.value = false
+    await nextTick()
+    successPulse.value = true
+    todayCount.value += 1
+    todayRecords.value = [record, ...todayRecords.value]
+    recentRecords.value = [record, ...recentRecords.value].slice(0, 100)
+    const [month, stats] = await Promise.all([getMonthCheckIns(monthKey.value), getCheckInStats()])
+    monthStats.value = month
+    checkInStats.value = stats
+    triggerSuccessHaptic()
     uni.showToast({
-      title: stats.todayCompleted ? "今日目标达成" : "打卡成功",
-      icon: "success",
-    });
+      title: stats.todayCompleted ? '今日目标达成' : '打卡成功',
+      icon: 'success',
+    })
   } finally {
-    checking.value = false;
+    checking.value = false
     setTimeout(() => {
-      successPulse.value = false;
-    }, 420);
+      successPulse.value = false
+    }, 420)
   }
 }
 
 async function handleDelete(record: CheckInRecord) {
   const confirmed = await new Promise<boolean>((resolve) => {
     uni.showModal({
-      title: "确认删除这条打卡记录吗？",
-      content: "删除后无法恢复",
-      confirmText: "删除",
-      confirmColor: "#ff5a6e",
+      title: '确认删除这条打卡记录吗？',
+      content: '删除后无法恢复',
+      confirmText: '删除',
+      confirmColor: '#ff5a6e',
       success: (result) => resolve(result.confirm),
       fail: () => resolve(false),
-    });
-  });
+    })
+  })
   if (!confirmed) {
-    return;
+    return
   }
 
-  await deleteCheckIn(record.id);
-  activeRecordActionId.value = null;
-  todayRecords.value = todayRecords.value.filter(
-    (item) => item.id !== record.id,
-  );
-  recentRecords.value = recentRecords.value.filter(
-    (item) => item.id !== record.id,
-  );
-  todayCount.value = Math.max(0, todayCount.value - 1);
-  const [month, stats] = await Promise.all([
-    getMonthCheckIns(monthKey.value),
-    getCheckInStats(),
-  ]);
-  monthStats.value = month;
-  checkInStats.value = stats;
+  await deleteCheckIn(record.id)
+  activeRecordActionId.value = null
+  todayRecords.value = todayRecords.value.filter((item) => item.id !== record.id)
+  recentRecords.value = recentRecords.value.filter((item) => item.id !== record.id)
+  todayCount.value = Math.max(0, todayCount.value - 1)
+  const [month, stats] = await Promise.all([getMonthCheckIns(monthKey.value), getCheckInStats()])
+  monthStats.value = month
+  checkInStats.value = stats
   uni.showToast({
-    title: "已删除",
-    icon: "none",
-  });
+    title: '已删除',
+    icon: 'none',
+  })
 }
 
 function selectCalendarDay(day: CalendarDay) {
-  selectedDateKey.value = day.key;
+  selectedDateKey.value = day.key
 }
 
 function toggleRecordActions(recordId: number) {
-  activeRecordActionId.value =
-    activeRecordActionId.value === recordId ? null : recordId;
+  activeRecordActionId.value = activeRecordActionId.value === recordId ? null : recordId
 }
 
 function getMonthKey(date = new Date()) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`
 }
 
 function formatDateKey(date: Date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
 function pad(value: number) {
-  return value.toString().padStart(2, "0");
+  return value.toString().padStart(2, '0')
 }
 
 function formatTime(value: string) {
-  const date = new Date(value);
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const date = new Date(value)
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 </script>
 
@@ -331,9 +304,7 @@ function formatTime(value: string) {
               <text class="goal-caption">今日目标</text>
               <text class="goal-status">{{ goalText }}</text>
             </view>
-            <text class="goal-fraction numeric">
-              {{ todayCount }}/{{ checkInStats.todayGoal || 1 }}
-            </text>
+            <text class="goal-fraction numeric"> {{ todayCount }}/{{ checkInStats.todayGoal || 1 }} </text>
           </view>
 
           <view class="checkin-action">
@@ -362,24 +333,14 @@ function formatTime(value: string) {
       <app-card accent="blue">
         <view class="calendar-card-content">
           <view class="calendar-head">
-            <button
-              class="icon-button"
-              aria-label="上个月"
-              hover-class="icon-button-pressed"
-              @click="changeMonth(-1)"
-            >
+            <button class="icon-button" aria-label="上个月" hover-class="icon-button-pressed" @click="changeMonth(-1)">
               <text class="i-carbon-chevron-left" />
             </button>
             <view class="month-title-wrap" @click="backToCurrentMonth">
               <text class="month-title">{{ monthTitle }}</text>
               <text class="month-subtitle">点按回到本月</text>
             </view>
-            <button
-              class="icon-button"
-              aria-label="下个月"
-              hover-class="icon-button-pressed"
-              @click="changeMonth(1)"
-            >
+            <button class="icon-button" aria-label="下个月" hover-class="icon-button-pressed" @click="changeMonth(1)">
               <text class="i-carbon-chevron-right" />
             </button>
           </view>
@@ -389,11 +350,7 @@ function formatTime(value: string) {
             </text>
           </view>
           <view class="calendar-grid days-grid">
-            <view
-              v-for="index in calendarStartOffset"
-              :key="`blank-${index}`"
-              class="calendar-day placeholder"
-            />
+            <view v-for="index in calendarStartOffset" :key="`blank-${index}`" class="calendar-day placeholder" />
             <view
               v-for="day in calendarDays"
               :key="day.key"
@@ -426,7 +383,7 @@ function formatTime(value: string) {
 
     <text class="ios-section-title">今日记录</text>
     <view class="record-card-shell">
-      <view class="record-card" accent="green" :show-accent="false">
+      <app-card class="record-card" accent="green" :show-accent="false">
         <view v-if="todayRecords.length === 0" class="empty-state">
           <app-icon name="target" accent="green" size="md" />
           <text>还没有记录，点亮今天的第一格。</text>
@@ -465,12 +422,12 @@ function formatTime(value: string) {
             </button>
           </view>
         </view>
-      </view>
+      </app-card>
     </view>
 
     <text class="ios-section-title">最近 7 天</text>
     <view class="record-card-shell">
-      <view class="record-card" accent="orange" :show-accent="false">
+      <app-card class="record-card" accent="orange" :show-accent="false">
         <view v-if="recentRecords.length === 0" class="empty-state">
           <app-icon name="streak" accent="orange" size="md" />
           <text>持续运动后，时间线会在这里生长。</text>
@@ -488,11 +445,11 @@ function formatTime(value: string) {
           <view class="recent-copy">
             <text class="recent-date">{{ day.label }}</text>
             <text class="recent-event">
-              {{ day.count > 0 ? "运动打卡" : "未打卡" }}
+              {{ day.count > 0 ? '运动打卡' : '未打卡' }}
             </text>
           </view>
           <text class="recent-time numeric">
-            {{ day.count > 0 ? `${day.count} 次` : "未完成" }}
+            {{ day.count > 0 ? `${day.count} 次` : '未完成' }}
           </text>
         </view>
         <button
@@ -501,9 +458,9 @@ function formatTime(value: string) {
           hover-class="recent-toggle-pressed"
           @click="recentExpanded = !recentExpanded"
         >
-          {{ recentExpanded ? "收起" : "展开全部" }}
+          {{ recentExpanded ? '收起' : '展开全部' }}
         </button>
-      </view>
+      </app-card>
     </view>
   </view>
 </template>
@@ -937,12 +894,12 @@ function formatTime(value: string) {
 
 .timeline-marker::after {
   position: absolute;
-  top: 54rpx;
-  bottom: -38rpx;
-  left: 21rpx;
+  top: 0rpx;
+  bottom: -37rpx;
+  left: 24rpx;
   width: 2rpx;
   background: var(--app-separator);
-  content: "";
+  content: '';
 }
 
 .recent-row:last-child .timeline-marker::after {

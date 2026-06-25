@@ -1,17 +1,20 @@
 <script lang="ts" setup>
-withDefaults(defineProps<{
-  icon?: string
-  accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'red'
-  variant?: 'solid' | 'soft' | 'ghost'
-  loading?: boolean
-  disabled?: boolean
-}>(), {
-  icon: '',
-  accent: 'green',
-  variant: 'solid',
-  loading: false,
-  disabled: false,
-})
+withDefaults(
+  defineProps<{
+    icon?: string
+    accent?: 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'red'
+    variant?: 'solid' | 'soft' | 'ghost'
+    loading?: boolean
+    disabled?: boolean
+  }>(),
+  {
+    icon: '',
+    accent: 'green',
+    variant: 'solid',
+    loading: false,
+    disabled: false,
+  },
+)
 
 defineEmits<{
   click: []
@@ -26,7 +29,13 @@ defineEmits<{
     hover-class="app-button-pressed"
     @click="$emit('click')"
   >
-    <app-icon v-if="icon" :name="icon" :accent="accent === 'red' ? 'pink' : accent" size="sm" :active="variant === 'solid'" />
+    <app-icon
+      v-if="icon"
+      :name="icon"
+      :accent="accent === 'red' ? 'pink' : accent"
+      size="sm"
+      :active="variant === 'solid'"
+    />
     <text class="button-label">
       <slot />
     </text>

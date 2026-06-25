@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => {
       {
         name: 'fix-vite-plugin-vue',
         configResolved(config) {
-          const plugin = config.plugins.find(item => item.name === 'vite:vue')
+          const plugin = config.plugins.find((item) => item.name === 'vite:vue')
           if (plugin?.api?.options) {
             plugin.api.options.devToolsEnabled = false
           }
@@ -62,10 +62,11 @@ export default defineConfig(({ mode }) => {
         vueTemplate: true,
       }),
       removeMpWeixinBrokenPreloadAssetsPlugin(isMpWeixin),
-      SKIP_OPEN_DEVTOOLS !== 'true' && openDevTools({
-        mode,
-        wechatDevtoolsCliPath: localEnv.WECHAT_DEVTOOLS_CLI_PATH,
-      }),
+      SKIP_OPEN_DEVTOOLS !== 'true' &&
+        openDevTools({
+          mode,
+          wechatDevtoolsCliPath: localEnv.WECHAT_DEVTOOLS_CLI_PATH,
+        }),
     ],
     resolve: {
       alias: {

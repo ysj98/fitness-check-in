@@ -8,8 +8,21 @@ defineProps<{
 </script>
 
 <template>
-  <view class="achievement-badge" :class="[`accent-${achievement.accent}`, `tier-${achievement.tier}`, variant || 'list', { unlocked: achievement.unlocked }]">
-    <app-icon :name="achievement.icon" :accent="achievement.accent" :active="achievement.unlocked" :size="variant === 'tile' ? 'sm' : 'md'" />
+  <view
+    class="achievement-badge"
+    :class="[
+      `accent-${achievement.accent}`,
+      `tier-${achievement.tier}`,
+      variant || 'list',
+      { unlocked: achievement.unlocked },
+    ]"
+  >
+    <app-icon
+      :name="achievement.icon"
+      :accent="achievement.accent"
+      :active="achievement.unlocked"
+      :size="variant === 'tile' ? 'sm' : 'md'"
+    />
     <view class="badge-copy">
       <view class="badge-head">
         <text class="badge-name">{{ achievement.name }}</text>
@@ -19,9 +32,7 @@ defineProps<{
       <view class="progress-track">
         <view class="progress-bar" :style="{ width: `${achievement.progress.percent}%` }" />
       </view>
-      <text class="badge-progress numeric">
-        {{ achievement.progress.current }}/{{ achievement.progress.target }}
-      </text>
+      <text class="badge-progress numeric"> {{ achievement.progress.current }}/{{ achievement.progress.target }} </text>
     </view>
     <text v-if="achievement.unlocked" class="badge-state i-fit-badge" />
   </view>

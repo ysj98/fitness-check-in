@@ -44,34 +44,38 @@ const form = reactive({
 
 const avatarPreview = computed(() => avatarTempUrl.value || form.avatarUrl || '/static/images/default-avatar.png')
 const genderIndex = computed(() => {
-  const index = genderOptions.findIndex(item => item.value === form.gender)
+  const index = genderOptions.findIndex((item) => item.value === form.gender)
   return index >= 0 ? index : 0
 })
 const genderLabel = computed(() => genderOptions[genderIndex.value].label)
 const dailyGoalIndex = computed(() => Math.max(0, Math.min(8, form.dailyGoal - 1)))
-const unlockedAchievementCount = computed(() => achievements.value.filter(item => item.unlocked).length)
+const unlockedAchievementCount = computed(() => achievements.value.filter((item) => item.unlocked).length)
 const completionPercent = computed(() => {
   if (achievements.value.length === 0) {
     return 0
   }
   return Math.round((unlockedAchievementCount.value / achievements.value.length) * 100)
 })
-const profileAccent = computed(() => form.gender === 'male' ? 'blue' : 'pink')
-const achievementCategories: { label: string, value: AchievementCategory }[] = [
+const profileAccent = computed(() => (form.gender === 'male' ? 'blue' : 'pink'))
+const achievementCategories: { label: string; value: AchievementCategory }[] = [
   { label: '打卡', value: 'checkin' },
   { label: '连续', value: 'streak' },
   { label: '体重', value: 'weight' },
   { label: '资料', value: 'profile' },
 ]
-const achievementCategoryOptions = computed(() => achievementCategories.map((category) => {
-  const total = achievements.value.filter(item => item.category === category.value).length
-  const unlocked = achievements.value.filter(item => item.category === category.value && item.unlocked).length
-  return {
-    label: `${category.label} ${unlocked}/${total}`,
-    value: category.value,
-  }
-}))
-const filteredAchievements = computed(() => achievements.value.filter(item => item.category === selectedAchievementCategory.value))
+const achievementCategoryOptions = computed(() =>
+  achievementCategories.map((category) => {
+    const total = achievements.value.filter((item) => item.category === category.value).length
+    const unlocked = achievements.value.filter((item) => item.category === category.value && item.unlocked).length
+    return {
+      label: `${category.label} ${unlocked}/${total}`,
+      value: category.value,
+    }
+  }),
+)
+const filteredAchievements = computed(() =>
+  achievements.value.filter((item) => item.category === selectedAchievementCategory.value),
+)
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 onShow(() => {
@@ -82,8 +86,7 @@ async function initProfile() {
   profileReady.value = false
   if (!tokenStore.hasLogin()) {
     await tokenStore.wxLogin()
-  }
-  else {
+  } else {
     await userStore.fetchUserInfo()
   }
   const [userInfo, nextAchievements] = [userStore.userInfo, await getAchievements()]
@@ -157,8 +160,7 @@ async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
       title: '头像已更新',
       icon: 'success',
     })
-  }
-  finally {
+  } finally {
     uploadingAvatar.value = false
   }
 }
@@ -197,8 +199,7 @@ async function saveProfile() {
     userStore.setUserInfo(userInfo)
     await refreshAchievements()
     triggerSuccessHaptic()
-  }
-  finally {
+  } finally {
     saving.value = false
   }
 }
@@ -218,9 +219,7 @@ async function saveProfile() {
             @chooseavatar="handleChooseAvatar"
           >
             <image class="avatar" :src="avatarPreview" mode="aspectFill" />
-            <view v-if="uploadingAvatar" class="avatar-mask">
-              上传中
-            </view>
+            <view v-if="uploadingAvatar" class="avatar-mask"> 上传中 </view>
           </button>
 
           <view class="profile-copy">
@@ -261,7 +260,7 @@ async function saveProfile() {
               placeholder-class="placeholder"
               @blur="scheduleProfileSave"
               @confirm="scheduleProfileSave"
-            >
+            />
           </view>
 
           <picker :value="genderIndex" :range="genderOptions" range-key="label" @change="handleGenderChange">
@@ -290,9 +289,7 @@ async function saveProfile() {
             <view class="field picker-field">
               <app-icon name="target" accent="green" size="sm" />
               <text class="field-label">每日目标</text>
-              <view class="field-value">
-                {{ form.dailyGoal }} 次
-              </view>
+              <view class="field-value"> {{ form.dailyGoal }} 次 </view>
               <text class="field-chevron i-carbon-chevron-right" />
             </view>
           </picker>
@@ -310,7 +307,7 @@ async function saveProfile() {
                 placeholder-class="placeholder"
                 @blur="scheduleProfileSave"
                 @confirm="scheduleProfileSave"
-              >
+              />
               <text>cm</text>
             </view>
           </view>
