@@ -156,16 +156,94 @@ pm2 start ecosystem.config.cjs --env production
 - `PATCH /api/user/weight-settings`
 - `GET /api/checkins/today`
 - `POST /api/checkins`
+- `POST /api/checkins/backfill`
 - `GET /api/checkins/stats`
 - `GET /api/checkins/recent?limit=20`
 - `GET /api/checkins/month?month=YYYY-MM`
 - `DELETE /api/checkins/:id`
+- `GET /api/achievements`
 - `GET /api/weights?page=1&pageSize=20`
 - `GET /api/weights/stats?days=7|30|90`
 - `POST /api/weights`
 - `PATCH /api/weights/:id`
 - `DELETE /api/weights/:id`
 - `GET /uploads/avatars/:file`
+
+### 打卡接口说明
+
+`POST /api/checkins` 创建正常打卡记录，请求体：
+
+```json
+{
+  "sportType": "跑步",
+  "durationMinutes": 45
+}
+```
+
+字段说明：
+
+- `sportType`：运动类型，支持 `散步`、`跑步`、`健身`、`骑行`、`游泳`、`瑜伽`、`其他`。
+- `durationMinutes`：运动时长，正整数，范围 `1-300` 分钟。
+
+打卡记录响应包含：
+
+```json
+{
+  "id": 1,
+  "checkedAt": "2026-06-27T04:00:00.000Z",
+  "isBackfill": false,
+  "backfillReason": "",
+  "sportType": "跑步",
+  "durationMinutes": 45
+}
+```
+
+### 补签接口说明
+
+`POST /api/checkins/backfill` 创建补签记录，请求体：
+
+```json
+{
+  "date": "2026-06-26",
+  "reason": "忘记打卡"
+}
+```
+
+补签规则：
+
+- 只能补签过去 30 天内的未打卡日期。
+- 今天和未来日期不能补签。
+- 已有打卡记录的日期不能补签。
+- 每个自然月最多补签 3 次。
+- 补签成功后计入月度热力、最近 7 天、连续打卡、累计打卡和成就统计。
+- `reason` 支持 `忘记打卡`、`已运动未记录`、`其他`。
+
+`GET /api/checkins/month?month=YYYY-MM` 会额外返回补签统计：
+
+```json
+{
+  "month": "2026-06",
+  "days": {
+    "2026-06-26": 1
+  },
+  "backfillDays": {
+    "2026-06-26": 1
+  },
+  "backfillUsed": 1,
+  "backfillLimit": 3
+}
+```
+
+### 成就接口说明
+
+`GET /api/achievements` 返回阶段式成就系列。成就系列包括：
+
+- 累计打卡
+- 连续打卡
+- 体重记录
+- 个人资料
+
+每个系列包含当前冲刺阶段、全部阶段详情、已完成阶段数和总阶段数。总进度按 `已完成阶段数 / 全部阶段数` 计算，阶段展示进度会限制在目标值以内，避免出现 `30/10` 这类超过目标值的展示。
 
 ## 数据库
 
@@ -179,6 +257,14 @@ pnpm prisma:migrate
 - `users`
 - `check_ins`
 - `weight_records`
+
+`check_ins` 记录正常打卡和补签打卡，包含：
+
+- `checkedAt`：打卡时间
+- `isBackfill`：是否补签
+- `backfillReason`：补签原因
+- `sportType`：运动类型
+- `durationMinutes`：运动时长，单位分钟
 
 体重统一以公斤保存。BMI 由体重和用户当前身高实时计算，不单独写入数据库。
 
