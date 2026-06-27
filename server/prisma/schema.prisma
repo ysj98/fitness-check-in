@@ -40,13 +40,15 @@ model WeightRecord {
 }
 
 model CheckIn {
-  id             Int      @id @default(autoincrement())
-  userId         Int
-  checkedAt      DateTime @default(now())
-  createdAt      DateTime @default(now())
-  isBackfill     Boolean  @default(false)
-  backfillReason String?  @db.VarChar(32)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  checkedAt       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  isBackfill      Boolean  @default(false)
+  backfillReason  String?  @db.VarChar(32)
+  sportType       String   @default("其他") @db.VarChar(16)
+  durationMinutes Int      @default(30)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, checkedAt])
   @@map("check_ins")

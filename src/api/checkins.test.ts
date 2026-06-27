@@ -2,16 +2,23 @@ import { describe, expect, it, vi } from 'vitest'
 import { createBackfillCheckIn, createCheckIn } from './checkins'
 
 describe('checkins api', () => {
-  it('sends an empty object body when creating a check-in', async () => {
+  it('posts sport details when creating a check-in', async () => {
     vi.mocked(uni.request).mockImplementationOnce((options) => {
       expect(options.url).toBe('/api/checkins')
       expect(options.method).toBe('POST')
-      expect(options.data).toEqual({})
+      expect(options.data).toEqual({ sportType: '跑步', durationMinutes: 45 })
       options.success?.({
         cookies: [],
         data: {
           code: 0,
-          data: { id: 1, checkedAt: '2026-06-25T00:00:00.000Z', isBackfill: false, backfillReason: '' },
+          data: {
+            id: 1,
+            checkedAt: '2026-06-25T00:00:00.000Z',
+            isBackfill: false,
+            backfillReason: '',
+            sportType: '跑步',
+            durationMinutes: 45,
+          },
           message: 'ok',
         },
         header: {},
@@ -20,11 +27,13 @@ describe('checkins api', () => {
       return {} as UniApp.RequestTask
     })
 
-    await expect(createCheckIn()).resolves.toEqual({
+    await expect(createCheckIn({ sportType: '跑步', durationMinutes: 45 })).resolves.toEqual({
       id: 1,
       checkedAt: '2026-06-25T00:00:00.000Z',
       isBackfill: false,
       backfillReason: '',
+      sportType: '跑步',
+      durationMinutes: 45,
     })
   })
 
@@ -42,6 +51,8 @@ describe('checkins api', () => {
             checkedAt: '2026-06-26T04:00:00.000Z',
             isBackfill: true,
             backfillReason: '忘记打卡',
+            sportType: '其他',
+            durationMinutes: 30,
           },
           message: 'ok',
         },
@@ -56,6 +67,8 @@ describe('checkins api', () => {
       checkedAt: '2026-06-26T04:00:00.000Z',
       isBackfill: true,
       backfillReason: '忘记打卡',
+      sportType: '其他',
+      durationMinutes: 30,
     })
   })
 })

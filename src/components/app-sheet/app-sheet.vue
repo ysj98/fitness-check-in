@@ -23,12 +23,12 @@ defineEmits<{
 
 <template>
   <view class="modal-mask" @click.self="$emit('close')">
-    <view class="app-sheet">
+    <view class="app-sheet" @click.stop>
       <view class="sheet-grabber" />
       <view class="sheet-head">
-        <button class="toolbar-button" @click="$emit('close')">{{ closeText }}</button>
+        <button class="toolbar-button" @click.stop="$emit('close')">{{ closeText }}</button>
         <text class="sheet-title">{{ title }}</text>
-        <button v-if="showSave" class="toolbar-button primary" :disabled="saving" @click="$emit('save')">
+        <button v-if="showSave" class="toolbar-button primary" :disabled="saving" @click.stop="$emit('save')">
           {{ saving ? '保存中' : saveText }}
         </button>
         <view v-else class="toolbar-spacer" />

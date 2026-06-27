@@ -5,6 +5,8 @@ export interface CheckInRecord {
   checkedAt: string
   isBackfill: boolean
   backfillReason: string
+  sportType: SportType
+  durationMinutes: number
 }
 
 export interface TodayCheckInRes {
@@ -21,6 +23,12 @@ export interface MonthCheckInRes {
 }
 
 export type BackfillReason = '忘记打卡' | '已运动未记录' | '其他'
+export type SportType = '散步' | '跑步' | '健身' | '骑行' | '游泳' | '瑜伽' | '其他'
+
+export interface CreateCheckInPayload {
+  sportType: SportType
+  durationMinutes: number
+}
 
 export interface CheckInBadge {
   key: string
@@ -41,8 +49,8 @@ export function getTodayCheckIns() {
   return http.get<TodayCheckInRes>('/api/checkins/today')
 }
 
-export function createCheckIn() {
-  return http.post<CheckInRecord>('/api/checkins', {})
+export function createCheckIn(payload: CreateCheckInPayload) {
+  return http.post<CheckInRecord>('/api/checkins', payload)
 }
 
 export function createBackfillCheckIn(date: string, reason: BackfillReason) {

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { BackfillReason, CheckInRecord, CheckInStatsRes, MonthCheckInRes } from '@/api/checkins'
+import type { BackfillReason, CheckInRecord, CheckInStatsRes, MonthCheckInRes, SportType } from '@/api/checkins'
 import {
   createBackfillCheckIn,
   createCheckIn,
@@ -39,6 +39,7 @@ interface RecentDaySummary {
   key: string
   label: string
   count: number
+  durationMinutes: number
   isToday: boolean
   isBackfilled: boolean
   canBackfill: boolean
@@ -48,6 +49,11 @@ interface RecordTouchStart {
   id: number
   x: number
   y: number
+}
+
+interface CheckInPreference {
+  sportType: SportType
+  durationMinutes: number
 }
 
 const emptyStats: CheckInStatsRes = {
@@ -69,6 +75,10 @@ const selectedDateKey = ref(formatDateKey(new Date()))
 const recentExpanded = ref(false)
 const activeRecordActionId = ref<number | null>(null)
 const recordTouchStart = ref<RecordTouchStart | null>(null)
+const checkInSheetOpen = ref(false)
+const selectedSportType = ref<SportType>('散步')
+const selectedDurationOption = ref<number | 'custom'>(30)
+const customDuration = ref('')
 const backfillSheetOpen = ref(false)
 const backfilling = ref(false)
 const selectedBackfillDateKey = ref('')
@@ -86,7 +96,10 @@ const monthStats = ref<MonthCheckInRes>({
 })
 const checkInStats = ref<CheckInStatsRes>({ ...emptyStats })
 const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+const sportTypes: SportType[] = ['散步', '跑步', '健身', '骑行', '游泳', '瑜伽', '其他']
+const durationOptions = [15, 30, 45, 60, 90]
 const backfillReasons: BackfillReason[] = ['忘记打卡', '已运动未记录', '其他']
+const checkInPreferenceStorageKey = 'checkin-preference'
 
 const todayLabel = computed(() => {
   const date = new Date()
@@ -142,13 +155,22 @@ const checkInButtonText = computed(() => {
 })
 
 const checkInSummaryText = computed(() => {
-  return `今天已打卡 ${todayCount.value} 次，连续坚持 ${checkInStats.value.currentStreak} 天`
+  return `今天 ${todayTotalDuration.value} 分钟，已打卡 ${todayCount.value} 次，连续坚持 ${checkInStats.value.currentStreak} 天`
 })
+
+const todayTotalDuration = computed(() =>
+  todayRecords.value.reduce((total, record) => total + (record.durationMinutes || 0), 0),
+)
 
 const recentDaySummaries = computed<RecentDaySummary[]>(() => {
   const countMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
     const key = formatDateKey(new Date(record.checkedAt))
     result[key] = (result[key] || 0) + 1
+    return result
+  }, {})
+  const durationMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
+    const key = formatDateKey(new Date(record.checkedAt))
+    result[key] = (result[key] || 0) + (record.durationMinutes || 0)
     return result
   }, {})
   const backfillMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
@@ -169,6 +191,7 @@ const recentDaySummaries = computed<RecentDaySummary[]>(() => {
       key,
       label: index === 0 ? '今天' : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
       count,
+      durationMinutes: durationMap[key] || 0,
       isToday: index === 0,
       isBackfilled: (backfillMap[key] || 0) > 0,
       canBackfill: getBackfillDisabledReason(key, count, monthStats.value, false) === '',
@@ -270,29 +293,126 @@ async function backToCurrentMonth() {
   await loadMonth()
 }
 
-async function handleCheckIn() {
+function openCheckInSheet() {
   if (checking.value) {
+    return
+  }
+
+  const preference = getStoredCheckInPreference()
+  selectedSportType.value = preference.sportType
+  selectedDurationOption.value = durationOptions.includes(preference.durationMinutes)
+    ? preference.durationMinutes
+    : 'custom'
+  customDuration.value = selectedDurationOption.value === 'custom' ? String(preference.durationMinutes) : ''
+  checkInSheetOpen.value = true
+}
+
+function getStoredCheckInPreference(): CheckInPreference {
+  const fallback: CheckInPreference = {
+    sportType: '散步',
+    durationMinutes: 30,
+  }
+
+  try {
+    const preference = uni.getStorageSync(checkInPreferenceStorageKey) as Partial<CheckInPreference> | null
+    if (
+      preference &&
+      sportTypes.includes(preference.sportType as SportType) &&
+      Number.isInteger(preference.durationMinutes) &&
+      Number(preference.durationMinutes) >= 1 &&
+      Number(preference.durationMinutes) <= 300
+    ) {
+      return {
+        sportType: preference.sportType as SportType,
+        durationMinutes: Number(preference.durationMinutes),
+      }
+    }
+  } catch {
+    return fallback
+  }
+
+  return fallback
+}
+
+function saveCheckInPreference(sportType: SportType, durationMinutes: number) {
+  try {
+    uni.setStorageSync(checkInPreferenceStorageKey, {
+      sportType,
+      durationMinutes,
+    })
+  } catch {
+    // Local preference is a convenience only; check-in should still succeed.
+  }
+}
+
+function closeCheckInSheet() {
+  if (checking.value) {
+    return
+  }
+  checkInSheetOpen.value = false
+}
+
+function selectDurationOption(value: number | 'custom') {
+  selectedDurationOption.value = value
+  if (value !== 'custom') {
+    customDuration.value = ''
+  }
+}
+
+function resolveDurationMinutes() {
+  if (typeof selectedDurationOption.value === 'number') {
+    return selectedDurationOption.value
+  }
+
+  const value = customDuration.value.trim()
+  if (!value) {
+    uni.showToast({ title: '请输入运动时长', icon: 'none' })
+    return null
+  }
+  if (!/^\d+$/.test(value)) {
+    uni.showToast({ title: '请输入有效运动时长', icon: 'none' })
+    return null
+  }
+
+  const minutes = Number(value)
+  if (minutes < 1 || minutes > 300) {
+    uni.showToast({ title: '运动时长需为 1-300 分钟', icon: 'none' })
+    return null
+  }
+  return minutes
+}
+
+async function handleConfirmCheckIn() {
+  if (checking.value) {
+    return
+  }
+
+  const durationMinutes = resolveDurationMinutes()
+  if (!durationMinutes) {
     return
   }
 
   checking.value = true
   try {
     await ensureLogin()
-    const record = await createCheckIn()
+    await createCheckIn({
+      sportType: selectedSportType.value,
+      durationMinutes,
+    })
+    saveCheckInPreference(selectedSportType.value, durationMinutes)
     successPulse.value = false
     await nextTick()
     successPulse.value = true
-    todayCount.value += 1
-    todayRecords.value = [record, ...todayRecords.value]
-    recentRecords.value = [record, ...recentRecords.value].slice(0, 100)
-    const [month, stats] = await Promise.all([getMonthCheckIns(monthKey.value), getCheckInStats()])
-    monthStats.value = month
-    checkInStats.value = stats
+    checkInSheetOpen.value = false
+    await loadDashboard()
     triggerSuccessHaptic()
     uni.showToast({
-      title: stats.todayCompleted ? '今日目标达成' : '打卡成功',
+      title: checkInStats.value.todayCompleted ? '今日目标达成' : '打卡成功',
       icon: 'success',
     })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '打卡失败，请重试'
+    uni.showToast({ title: message, icon: 'none' })
   } finally {
     checking.value = false
     setTimeout(() => {
@@ -501,11 +621,10 @@ function formatTime(value: string) {
               :class="{ checking, success: successPulse }"
               :disabled="checking || loading"
               hover-class="checkin-button-pressed"
-              @click="handleCheckIn"
+              @click="openCheckInSheet"
             >
               <view class="button-copy">
                 <text class="button-main">{{ checkInButtonText }}</text>
-                <text class="button-sub">今日第 {{ todayCount + 1 }} 次</text>
               </view>
             </button>
             <view v-if="successPulse" class="success-ring" />
@@ -604,7 +723,9 @@ function formatTime(value: string) {
           <view class="record-content">
             <app-icon name="checkin" accent="green" size="sm" active />
             <view class="record-main">
-              <text class="record-title">运动打卡</text>
+              <text class="record-title">
+                {{ record.isBackfill ? '补签打卡' : record.sportType }} · {{ record.durationMinutes }} 分钟
+              </text>
               <text class="record-detail">
                 {{ formatTime(record.checkedAt) }}
               </text>
@@ -641,7 +762,7 @@ function formatTime(value: string) {
             补签
           </button>
           <text v-else class="recent-time numeric">
-            {{ day.count > 0 ? `${day.count} 次` : '未完成' }}
+            {{ day.count > 0 ? `${day.count} 次 · ${day.durationMinutes} 分钟` : '未完成' }}
           </text>
         </view>
         <button
@@ -654,6 +775,68 @@ function formatTime(value: string) {
         </button>
       </app-card>
     </view>
+
+    <app-sheet
+      v-if="checkInSheetOpen"
+      title="运动打卡"
+      save-text="确认打卡"
+      :saving="checking"
+      close-text="取消"
+      @close="closeCheckInSheet"
+      @save="handleConfirmCheckIn"
+    >
+      <view class="checkin-sheet">
+        <view class="checkin-field">
+          <text class="checkin-field-title">运动类型</text>
+          <view class="sheet-option-grid sport-options">
+            <button
+              v-for="type in sportTypes"
+              :key="type"
+              class="sheet-option"
+              :class="{ active: selectedSportType === type }"
+              hover-class="sheet-option-pressed"
+              @click.stop="selectedSportType = type"
+            >
+              {{ type }}
+            </button>
+          </view>
+        </view>
+
+        <view class="checkin-field">
+          <text class="checkin-field-title">运动时长</text>
+          <view class="sheet-option-grid duration-options">
+            <button
+              v-for="minutes in durationOptions"
+              :key="minutes"
+              class="sheet-option"
+              :class="{ active: selectedDurationOption === minutes }"
+              hover-class="sheet-option-pressed"
+              @click.stop="selectDurationOption(minutes)"
+            >
+              {{ minutes }} 分钟
+            </button>
+            <button
+              class="sheet-option"
+              :class="{ active: selectedDurationOption === 'custom' }"
+              hover-class="sheet-option-pressed"
+              @click.stop="selectDurationOption('custom')"
+            >
+              自定义
+            </button>
+          </view>
+          <view v-if="selectedDurationOption === 'custom'" class="custom-duration-row">
+            <input
+              v-model="customDuration"
+              class="custom-duration-input numeric"
+              type="number"
+              :maxlength="3"
+              placeholder="请输入分钟数"
+            />
+            <text class="custom-duration-unit">分钟</text>
+          </view>
+        </view>
+      </view>
+    </app-sheet>
 
     <app-sheet
       v-if="backfillSheetOpen"
@@ -679,7 +862,7 @@ function formatTime(value: string) {
               class="reason-option"
               :class="{ active: selectedBackfillReason === reason }"
               hover-class="reason-option-pressed"
-              @click="selectBackfillReason(reason)"
+              @click.stop="selectBackfillReason(reason)"
             >
               {{ reason }}
             </button>
@@ -815,12 +998,6 @@ function formatTime(value: string) {
 .button-main {
   font-size: 42rpx;
   font-weight: 860;
-}
-
-.button-sub {
-  margin-top: 8rpx;
-  font-size: 25rpx;
-  opacity: 0.82;
 }
 
 .success-ring {
@@ -1202,6 +1379,10 @@ function formatTime(value: string) {
 .recent-time {
   flex: 0 0 auto;
   margin: 0;
+  max-width: 240rpx;
+  text-align: right;
+  white-space: normal;
+  line-height: 1.25;
 }
 
 .recent-backfill-button {
@@ -1263,6 +1444,93 @@ function formatTime(value: string) {
   color: var(--app-label-secondary);
   font-size: 25rpx;
   text-align: center;
+}
+
+.checkin-sheet {
+  padding-top: 18rpx;
+}
+
+.checkin-field {
+  margin-bottom: 18rpx;
+  padding: 20rpx;
+  border-radius: 22rpx;
+  background: var(--app-surface);
+  box-sizing: border-box;
+}
+
+.checkin-field-title {
+  display: block;
+  margin-bottom: 16rpx;
+  color: var(--app-label-secondary);
+  font-size: 24rpx;
+  font-weight: 680;
+}
+
+.sheet-option-grid {
+  display: grid;
+  gap: 12rpx;
+}
+
+.sport-options {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.duration-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.sheet-option {
+  min-width: 0;
+  height: 68rpx;
+  padding: 0 10rpx;
+  border-radius: 18rpx;
+  color: var(--app-label-secondary);
+  background: var(--app-fill);
+  font-size: 23rpx;
+  font-weight: 700;
+  line-height: 68rpx;
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out,
+    background var(--app-motion-fast) ease-out;
+}
+
+.sheet-option.active {
+  color: var(--app-green);
+  background: var(--app-green-soft);
+  box-shadow: inset 0 0 0 2rpx rgba(34, 199, 111, 0.28);
+}
+
+.sheet-option-pressed {
+  opacity: 0.78;
+  transform: scale(0.97);
+}
+
+.custom-duration-row {
+  display: flex;
+  align-items: center;
+  min-height: 78rpx;
+  margin-top: 14rpx;
+  padding: 0 18rpx;
+  border-radius: 18rpx;
+  background: var(--app-fill);
+  box-sizing: border-box;
+}
+
+.custom-duration-input {
+  flex: 1;
+  min-width: 0;
+  height: 78rpx;
+  color: var(--app-label-primary);
+  font-size: 26rpx;
+  font-weight: 760;
+}
+
+.custom-duration-unit {
+  flex: 0 0 auto;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+  font-weight: 680;
 }
 
 .backfill-sheet {

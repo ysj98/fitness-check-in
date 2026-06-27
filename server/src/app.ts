@@ -218,6 +218,14 @@ const recentQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+const sportTypeSchema = z.enum(['散步', '跑步', '健身', '骑行', '游泳', '瑜伽', '其他'])
+const durationMinutesSchema = z.coerce.number().int().min(1).max(300)
+
+const createCheckInSchema = z.object({
+  sportType: sportTypeSchema,
+  durationMinutes: durationMinutesSchema,
+})
+
 const backfillReasonSchema = z.enum(['忘记打卡', '已运动未记录', '其他'])
 
 const backfillCheckInSchema = z.object({
@@ -320,6 +328,8 @@ function serializeCheckInRecord(record: AppCheckIn) {
     checkedAt: record.checkedAt.toISOString(),
     isBackfill: Boolean(record.isBackfill),
     backfillReason: record.backfillReason || '',
+    sportType: record.sportType || '其他',
+    durationMinutes: record.durationMinutes || 30,
   }
 }
 
@@ -945,10 +955,13 @@ export async function createApp(options: CreateAppOptions) {
   })
 
   app.post('/api/checkins', async (request) => {
+    const body = createCheckInSchema.parse(request.body)
     const record = await app.db.checkIn.create({
       data: {
         userId: request.user.userId,
         checkedAt: new Date(),
+        sportType: body.sportType,
+        durationMinutes: body.durationMinutes,
       },
     })
 

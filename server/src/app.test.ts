@@ -64,6 +64,8 @@ function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; w
           createdAt: new Date(),
           isBackfill: Boolean(args.data.isBackfill),
           backfillReason: args.data.backfillReason || null,
+          sportType: args.data.sportType || '其他',
+          durationMinutes: args.data.durationMinutes || 30,
         }
         checkIns.push(record)
         return record
@@ -193,6 +195,8 @@ function checkInAtChinaDay(userId: number, dayOffset: number, id: number): AppCh
     createdAt: checkedAt,
     isBackfill: false,
     backfillReason: null,
+    sportType: '其他',
+    durationMinutes: 30,
   }
 }
 
@@ -253,11 +257,13 @@ describe('fitness check-in api', () => {
       method: 'POST',
       url: '/api/checkins',
       headers: { authorization: `Bearer ${session.token}` },
+      payload: { sportType: '跑步', durationMinutes: 30 },
     })
     await app.inject({
       method: 'POST',
       url: '/api/checkins',
       headers: { authorization: `Bearer ${session.token}` },
+      payload: { sportType: '瑜伽', durationMinutes: 45 },
     })
 
     const response = await app.inject({
@@ -268,9 +274,13 @@ describe('fitness check-in api', () => {
 
     expect(response.json().data.count).toBe(2)
     expect(response.json().data.records).toHaveLength(2)
+    expect(response.json().data.records[0]).toMatchObject({
+      sportType: '瑜伽',
+      durationMinutes: 45,
+    })
   })
 
-  it('accepts check-in creation with an empty json body', async () => {
+  it('saves check-in sport details and rejects invalid duration', async () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
@@ -285,11 +295,27 @@ describe('fitness check-in api', () => {
         authorization: `Bearer ${session.token}`,
         'content-type': 'application/json',
       },
-      payload: '',
+      payload: { sportType: '骑行', durationMinutes: 60 },
     })
 
     expect(response.statusCode).toBe(200)
-    expect(response.json().data.id).toBe(1)
+    expect(response.json().data).toMatchObject({
+      id: 1,
+      sportType: '骑行',
+      durationMinutes: 60,
+    })
+
+    const invalidResponse = await app.inject({
+      method: 'POST',
+      url: '/api/checkins',
+      headers: {
+        authorization: `Bearer ${session.token}`,
+        'content-type': 'application/json',
+      },
+      payload: { sportType: '跑步', durationMinutes: 301 },
+    })
+
+    expect(invalidResponse.statusCode).toBe(400)
   })
 
   it('groups month check-ins by China date', async () => {

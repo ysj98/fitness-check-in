@@ -1,0 +1,3 @@
+ALTER TABLE `check_ins`
+  ADD COLUMN `sportType` VARCHAR(16) NOT NULL DEFAULT '其他',
+  ADD COLUMN `durationMinutes` INTEGER NOT NULL DEFAULT 30;
