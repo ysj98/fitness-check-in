@@ -811,34 +811,29 @@ describe('fitness check-in api', () => {
     })
     const achievements = response.json().data
 
-    expect(achievements.find((item: { key: string }) => item.key === 'checkin_first').progress).toEqual({
-      current: 0,
-      target: 1,
-      percent: 0,
+    expect(achievements).toHaveLength(4)
+    expect(achievements.find((item: { key: string }) => item.key === 'total-checkin')).toMatchObject({
+      completedLevelCount: 0,
+      totalLevelCount: 7,
+      currentLevel: {
+        threshold: 1,
+        progress: { current: 0, displayCurrent: 0, target: 1, percent: 0 },
+      },
     })
-    expect(achievements.find((item: { key: string }) => item.key === 'profile_complete').unlocked).toBe(false)
+    expect(achievements.find((item: { key: string }) => item.key === 'profile-complete')).toMatchObject({
+      completedLevelCount: 0,
+      allCompleted: false,
+    })
   })
 
-  it('returns check-in and streak achievement progress', async () => {
+  it('advances check-in stages without displaying progress above the target', async () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
       exchangeCode: async () => ({ openid: 'openid-1' }),
     })
     const session = await login(app)
-    db.checkIns.push(
-      checkInAtChinaDay(session.user.userId, 0, 1),
-      checkInAtChinaDay(session.user.userId, 0, 2),
-      checkInAtChinaDay(session.user.userId, 1, 3),
-      checkInAtChinaDay(session.user.userId, 1, 4),
-      checkInAtChinaDay(session.user.userId, 2, 5),
-    )
-    await app.inject({
-      method: 'PATCH',
-      url: '/api/user/profile',
-      headers: { authorization: `Bearer ${session.token}` },
-      payload: { nickname: 'Alex', dailyGoal: 2 },
-    })
+    db.checkIns.push(...Array.from({ length: 30 }, (_, index) => checkInAtChinaDay(session.user.userId, 0, index + 1)))
 
     const response = await app.inject({
       method: 'GET',
@@ -846,13 +841,49 @@ describe('fitness check-in api', () => {
       headers: { authorization: `Bearer ${session.token}` },
     })
     const achievements = response.json().data
+    const checkinSeries = achievements.find((item: { key: string }) => item.key === 'total-checkin')
+    const tenCountLevel = checkinSeries.levels.find((level: { threshold: number }) => level.threshold === 10)
 
-    expect(achievements.find((item: { key: string }) => item.key === 'checkin_first').unlocked).toBe(true)
-    expect(achievements.find((item: { key: string }) => item.key === 'streak_3').unlocked).toBe(true)
-    expect(achievements.find((item: { key: string }) => item.key === 'goal_streak_3').progress).toEqual({
-      current: 2,
-      target: 3,
-      percent: 67,
+    expect(checkinSeries.completedLevelCount).toBe(3)
+    expect(checkinSeries.currentLevel).toMatchObject({
+      threshold: 60,
+      progress: { current: 30, displayCurrent: 30, target: 60, percent: 50 },
+    })
+    expect(tenCountLevel.progress).toEqual({
+      current: 30,
+      displayCurrent: 10,
+      target: 10,
+      percent: 100,
+    })
+  })
+
+  it('marks streak stages complete at 100 consecutive days', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    db.checkIns.push(
+      ...Array.from({ length: 100 }, (_, index) => checkInAtChinaDay(session.user.userId, index, index + 1)),
+    )
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/achievements',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+    const achievements = response.json().data
+    const streakSeries = achievements.find((item: { key: string }) => item.key === 'current-streak')
+
+    expect(streakSeries).toMatchObject({
+      completedLevelCount: 6,
+      totalLevelCount: 6,
+      allCompleted: true,
+      currentLevel: {
+        threshold: 100,
+        progress: { current: 100, displayCurrent: 100, target: 100, percent: 100 },
+      },
     })
   })
 
@@ -889,10 +920,15 @@ describe('fitness check-in api', () => {
       headers: authorization,
     })
     const achievements = response.json().data
+    const weightSeries = achievements.find((item: { key: string }) => item.key === 'weight-record')
 
-    expect(achievements.find((item: { key: string }) => item.key === 'weight_first').unlocked).toBe(true)
-    expect(achievements.find((item: { key: string }) => item.key === 'weight_7').unlocked).toBe(true)
-    expect(achievements.find((item: { key: string }) => item.key === 'weight_target').unlocked).toBe(true)
+    expect(weightSeries).toMatchObject({
+      completedLevelCount: 2,
+      currentLevel: {
+        threshold: 30,
+        progress: { current: 7, displayCurrent: 7, target: 30, percent: 23 },
+      },
+    })
   })
 
   it('unlocks profile achievement when core fields are complete', async () => {
@@ -922,9 +958,15 @@ describe('fitness check-in api', () => {
       url: '/api/achievements',
       headers: { authorization: `Bearer ${session.token}` },
     })
-    const profileAchievement = response.json().data.find((item: { key: string }) => item.key === 'profile_complete')
+    const profileAchievement = response.json().data.find((item: { key: string }) => item.key === 'profile-complete')
 
-    expect(profileAchievement.unlocked).toBe(true)
-    expect(profileAchievement.progress.percent).toBe(100)
+    expect(profileAchievement).toMatchObject({
+      completedLevelCount: 1,
+      totalLevelCount: 1,
+      allCompleted: true,
+      currentLevel: {
+        progress: { current: 1, displayCurrent: 1, target: 1, percent: 100 },
+      },
+    })
   })
 })

@@ -1,9 +1,14 @@
 <script lang="ts" setup>
-import type { Achievement, AchievementCategory } from '@/api/achievements'
+import type { AchievementBadge, AchievementCategory, AchievementSeriesProgress } from '@/api/achievements'
 import type { ThemeMode } from '@/store'
 import { getAchievements } from '@/api/achievements'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
 import { useThemeStore, useTokenStore, useUserStore } from '@/store'
+import {
+  filterAchievementSeries,
+  getAchievementCategoryOptions,
+  getAchievementTotals,
+} from '@/utils/achievement-progress'
 import { triggerSuccessHaptic } from '@/utils/haptics'
 
 definePage({
@@ -20,8 +25,9 @@ const saving = ref(false)
 const profileReady = ref(false)
 const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
-const achievements = ref<Achievement[]>([])
+const achievements = ref<AchievementSeriesProgress[]>([])
 const selectedAchievementCategory = ref<AchievementCategory>('checkin')
+const selectedAchievementSeries = ref<AchievementSeriesProgress | null>(null)
 const genderOptions = [
   { label: '未设置', value: '' },
   { label: '男', value: 'male' },
@@ -49,33 +55,27 @@ const genderIndex = computed(() => {
 })
 const genderLabel = computed(() => genderOptions[genderIndex.value].label)
 const dailyGoalIndex = computed(() => Math.max(0, Math.min(8, form.dailyGoal - 1)))
-const unlockedAchievementCount = computed(() => achievements.value.filter((item) => item.unlocked).length)
-const completionPercent = computed(() => {
-  if (achievements.value.length === 0) {
-    return 0
-  }
-  return Math.round((unlockedAchievementCount.value / achievements.value.length) * 100)
-})
+const achievementTotals = computed(() => getAchievementTotals(achievements.value))
+const achievementProgressText = computed(() => achievementTotals.value.text)
+const completionPercent = computed(() => achievementTotals.value.percent)
 const profileAccent = computed(() => (form.gender === 'male' ? 'blue' : 'pink'))
-const achievementCategories: { label: string; value: AchievementCategory }[] = [
-  { label: '打卡', value: 'checkin' },
-  { label: '连续', value: 'streak' },
-  { label: '体重', value: 'weight' },
-  { label: '资料', value: 'profile' },
-]
-const achievementCategoryOptions = computed(() =>
-  achievementCategories.map((category) => {
-    const total = achievements.value.filter((item) => item.category === category.value).length
-    const unlocked = achievements.value.filter((item) => item.category === category.value && item.unlocked).length
-    return {
-      label: `${category.label} ${unlocked}/${total}`,
-      value: category.value,
-    }
-  }),
+const achievementCategoryOptions = computed(() => getAchievementCategoryOptions(achievements.value))
+const filteredAchievementSeries = computed(() =>
+  filterAchievementSeries(achievements.value, selectedAchievementCategory.value),
 )
-const filteredAchievements = computed(() =>
-  achievements.value.filter((item) => item.category === selectedAchievementCategory.value),
-)
+const badgeAccentMap: Record<AchievementBadge, 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond'> = {
+  BRONZE: 'bronze',
+  SILVER: 'silver',
+  GOLD: 'gold',
+  PLATINUM: 'platinum',
+  DIAMOND: 'diamond',
+}
+const categoryAccentMap: Record<AchievementCategory, 'green' | 'orange' | 'blue' | 'pink'> = {
+  checkin: 'green',
+  streak: 'orange',
+  weight: 'blue',
+  profile: 'pink',
+}
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 
 onShow(() => {
@@ -125,6 +125,29 @@ function selectTheme(mode: ThemeMode) {
 
 function selectAchievementCategory(category: AchievementCategory) {
   selectedAchievementCategory.value = category
+}
+
+function openAchievementDetail(series: AchievementSeriesProgress) {
+  selectedAchievementSeries.value = series
+}
+
+function closeAchievementDetail() {
+  selectedAchievementSeries.value = null
+}
+
+function getLevelStateText(level: AchievementSeriesProgress['levels'][number]) {
+  if (level.completed) {
+    return '已完成'
+  }
+  return level.isCurrent ? '冲刺中' : '未开始'
+}
+
+function getLevelBadgeClass(badge: AchievementBadge) {
+  return `badge-${badgeAccentMap[badge]}`
+}
+
+function getSeriesAccent(category: AchievementCategory) {
+  return categoryAccentMap[category]
 }
 
 async function refreshAchievements() {
@@ -224,11 +247,11 @@ async function saveProfile() {
 
           <view class="profile-copy">
             <text class="profile-title">{{ form.nickname || '微信用户' }}</text>
-            <text class="profile-subtitle">{{ unlockedAchievementCount }} 项成就已解锁</text>
+            <text class="profile-subtitle">{{ achievementProgressText }} 阶段已完成</text>
             <view class="profile-stats">
               <view class="profile-stat">
                 <text class="stat-label">已解锁</text>
-                <text class="stat-value numeric">{{ unlockedAchievementCount }} 项</text>
+                <text class="stat-value numeric">{{ achievementProgressText }}</text>
               </view>
               <view class="profile-stat">
                 <text class="stat-label">每日目标</text>
@@ -332,7 +355,7 @@ async function saveProfile() {
 
     <view class="achievement-heading">
       <text class="ios-section-title achievement-section-title">我的成就</text>
-      <text class="achievement-count numeric">{{ unlockedAchievementCount }}/{{ achievements.length }}</text>
+      <text class="achievement-count numeric">{{ achievementProgressText }}</text>
     </view>
     <view class="achievement-filter-shell">
       <app-segmented-control
@@ -341,15 +364,77 @@ async function saveProfile() {
         @change="selectAchievementCategory"
       />
     </view>
-    <view class="badge-grid">
+    <view class="series-grid">
       <achievement-badge
-        v-for="(achievement, index) in filteredAchievements"
-        :key="achievement.key"
-        :achievement="achievement"
-        variant="tile"
+        v-for="(series, index) in filteredAchievementSeries"
+        :key="series.key"
+        :series="series"
         :style="{ animationDelay: `${Math.min(index, 10) * 35}ms` }"
+        @select="openAchievementDetail"
       />
     </view>
+
+    <app-sheet
+      v-if="selectedAchievementSeries"
+      :title="selectedAchievementSeries.seriesName"
+      close-text="关闭"
+      :show-save="false"
+      @close="closeAchievementDetail"
+    >
+      <view class="achievement-detail">
+        <view class="achievement-detail-summary">
+          <app-icon
+            :name="selectedAchievementSeries.icon"
+            :accent="getSeriesAccent(selectedAchievementSeries.category)"
+            :active="selectedAchievementSeries.allCompleted"
+            size="lg"
+          />
+          <view class="achievement-detail-copy">
+            <text class="detail-title">
+              已完成 {{ selectedAchievementSeries.completedLevelCount }}/{{ selectedAchievementSeries.totalLevelCount }}
+              阶段
+            </text>
+            <text class="detail-subtitle">
+              {{ selectedAchievementSeries.allCompleted ? '全部阶段已完成' : '继续冲刺下一阶段目标' }}
+            </text>
+          </view>
+        </view>
+
+        <view class="level-list">
+          <view
+            v-for="level in selectedAchievementSeries.levels"
+            :key="level.key"
+            class="level-row"
+            :class="[
+              getLevelBadgeClass(level.badge),
+              {
+                completed: level.completed,
+                current: level.isCurrent,
+                upcoming: !level.completed && !level.isCurrent,
+              },
+            ]"
+          >
+            <view class="level-marker">
+              <text v-if="level.completed" class="i-carbon-checkmark-filled" />
+              <text v-else class="numeric">{{ level.threshold }}</text>
+            </view>
+            <view class="level-copy">
+              <view class="level-row-head">
+                <text class="level-row-title">{{ level.title }}</text>
+                <text class="level-row-state">{{ getLevelStateText(level) }}</text>
+              </view>
+              <text class="level-row-desc">{{ level.description }}</text>
+              <view class="detail-progress-track">
+                <view class="detail-progress-bar" :style="{ width: `${level.progress.percent}%` }" />
+              </view>
+              <text class="level-row-progress numeric">
+                {{ level.progress.displayCurrent }}/{{ level.progress.target }}
+              </text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </app-sheet>
   </view>
 </template>
 
@@ -363,7 +448,7 @@ async function saveProfile() {
 .form-section-shell,
 .appearance-card-shell,
 .achievement-filter-shell,
-.badge-grid {
+.series-grid {
   margin-right: var(--app-gutter);
   margin-left: var(--app-gutter);
 }
@@ -624,14 +709,183 @@ async function saveProfile() {
   box-shadow: 0 5rpx 14rpx rgba(31, 88, 58, 0.075);
 }
 
-.badge-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
+.series-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
-.badge-grid :deep(.achievement-badge) {
+.series-grid :deep(.achievement-series-card) {
   animation: app-enter 260ms var(--app-ease-out) both;
+}
+
+.achievement-detail {
+  padding: 18rpx 0 0;
+}
+
+.achievement-detail-summary {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 22rpx 20rpx;
+  border-radius: 24rpx;
+  background: var(--app-surface);
+  box-sizing: border-box;
+}
+
+.achievement-detail-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title,
+.detail-subtitle,
+.level-row-title,
+.level-row-desc,
+.level-row-progress {
+  display: block;
+}
+
+.detail-title {
+  color: var(--app-label-primary);
+  font-size: 29rpx;
+  font-weight: 780;
+}
+
+.detail-subtitle {
+  margin-top: 6rpx;
+  color: var(--app-label-secondary);
+  font-size: 22rpx;
+}
+
+.level-list {
+  margin-top: 18rpx;
+  border-radius: 24rpx;
+  background: var(--app-surface);
+  overflow: hidden;
+}
+
+.level-row {
+  --level-accent: var(--app-blue);
+  --level-soft: var(--app-blue-soft);
+  display: flex;
+  gap: 18rpx;
+  min-height: 132rpx;
+  margin-left: 20rpx;
+  padding: 22rpx 22rpx 22rpx 0;
+  border-bottom: 1rpx solid var(--app-separator);
+  box-sizing: border-box;
+}
+
+.level-row:last-child {
+  border-bottom: 0;
+}
+
+.level-row.upcoming {
+  opacity: 0.62;
+}
+
+.level-row.current {
+  opacity: 1;
+}
+
+.level-marker {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 54rpx;
+  height: 54rpx;
+  margin-top: 2rpx;
+  border-radius: 18rpx;
+  color: var(--level-accent);
+  background: var(--level-soft);
+  font-size: 21rpx;
+  font-weight: 820;
+}
+
+.level-row.completed .level-marker {
+  color: #fff;
+  background: var(--level-accent);
+}
+
+.level-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.level-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.level-row-title {
+  min-width: 0;
+  color: var(--app-label-primary);
+  font-size: 26rpx;
+  font-weight: 740;
+}
+
+.level-row-state {
+  flex: 0 0 auto;
+  color: var(--level-accent);
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.level-row-desc {
+  margin-top: 6rpx;
+  color: var(--app-label-secondary);
+  font-size: 21rpx;
+  line-height: 1.36;
+}
+
+.detail-progress-track {
+  height: 8rpx;
+  margin-top: 14rpx;
+  border-radius: 999rpx;
+  background: var(--app-fill);
+  overflow: hidden;
+}
+
+.detail-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--level-accent);
+}
+
+.level-row-progress {
+  margin-top: 6rpx;
+  color: var(--app-label-tertiary);
+  font-size: 19rpx;
+  text-align: right;
+}
+
+.badge-bronze {
+  --level-accent: var(--app-orange);
+  --level-soft: var(--app-orange-soft);
+}
+
+.badge-silver {
+  --level-accent: var(--app-blue);
+  --level-soft: var(--app-blue-soft);
+}
+
+.badge-gold {
+  --level-accent: var(--app-gold);
+  --level-soft: var(--app-gold-soft);
+}
+
+.badge-platinum {
+  --level-accent: var(--app-purple);
+  --level-soft: var(--app-purple-soft);
+}
+
+.badge-diamond {
+  --level-accent: var(--app-blue);
+  --level-soft: var(--app-blue-soft);
 }
 
 @media screen and (max-width: 360px) {
@@ -644,8 +898,8 @@ async function saveProfile() {
     display: none;
   }
 
-  .badge-grid {
-    grid-template-columns: 1fr;
+  .series-grid {
+    gap: 14rpx;
   }
 }
 </style>

@@ -4,10 +4,14 @@ withDefaults(
     title: string
     saving?: boolean
     saveText?: string
+    closeText?: string
+    showSave?: boolean
   }>(),
   {
     saving: false,
     saveText: '保存',
+    closeText: '取消',
+    showSave: true,
   },
 )
 
@@ -22,11 +26,12 @@ defineEmits<{
     <view class="app-sheet">
       <view class="sheet-grabber" />
       <view class="sheet-head">
-        <button class="toolbar-button" @click="$emit('close')">取消</button>
+        <button class="toolbar-button" @click="$emit('close')">{{ closeText }}</button>
         <text class="sheet-title">{{ title }}</text>
-        <button class="toolbar-button primary" :disabled="saving" @click="$emit('save')">
+        <button v-if="showSave" class="toolbar-button primary" :disabled="saving" @click="$emit('save')">
           {{ saving ? '保存中' : saveText }}
         </button>
+        <view v-else class="toolbar-spacer" />
       </view>
       <slot />
     </view>
@@ -88,6 +93,11 @@ defineEmits<{
   background: transparent;
   font-size: 27rpx;
   line-height: 64rpx;
+}
+
+.toolbar-spacer {
+  min-width: 112rpx;
+  height: 64rpx;
 }
 
 .toolbar-button:first-child {

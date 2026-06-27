@@ -1,28 +1,42 @@
 import { http } from '@/http/http'
 
 export type AchievementCategory = 'checkin' | 'streak' | 'weight' | 'profile'
-export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'platinum'
-export type AchievementIcon = 'checkin' | 'streak' | 'target' | 'weight' | 'profile' | 'badge'
-export type AchievementAccent = 'green' | 'blue' | 'orange' | 'pink' | 'gold'
+export type AchievementBadge = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND'
+export type AchievementIcon = 'checkin' | 'streak' | 'weight' | 'profile'
+export type AchievementMetricKey = 'totalCheckinCount' | 'currentStreak' | 'weightRecordCount' | 'profileCompleted'
 
 export interface AchievementProgress {
   current: number
+  displayCurrent: number
   target: number
   percent: number
 }
 
-export interface Achievement {
+export interface AchievementLevelProgress {
   key: string
-  name: string
+  threshold: number
+  title: string
   description: string
-  category: AchievementCategory
-  tier: AchievementTier
-  icon: AchievementIcon
-  accent: AchievementAccent
-  unlocked: boolean
+  badge: AchievementBadge
+  completed: boolean
+  isCurrent: boolean
   progress: AchievementProgress
 }
 
+export interface AchievementSeriesProgress {
+  key: string
+  category: AchievementCategory
+  metricKey: AchievementMetricKey
+  icon: AchievementIcon
+  seriesName: string
+  metricValue: number
+  completedLevelCount: number
+  totalLevelCount: number
+  allCompleted: boolean
+  currentLevel: AchievementLevelProgress
+  levels: AchievementLevelProgress[]
+}
+
 export function getAchievements() {
-  return http.get<Achievement[]>('/api/achievements')
+  return http.get<AchievementSeriesProgress[]>('/api/achievements')
 }

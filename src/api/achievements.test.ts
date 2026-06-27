@@ -12,15 +12,26 @@ describe('achievements api', () => {
           code: 0,
           data: [
             {
-              key: 'checkin_first',
-              name: '初次点亮',
-              description: '完成第一次运动打卡',
+              key: 'total-checkin',
               category: 'checkin',
-              tier: 'bronze',
+              metricKey: 'totalCheckinCount',
               icon: 'checkin',
-              accent: 'green',
-              unlocked: false,
-              progress: { current: 0, target: 1, percent: 0 },
+              seriesName: '累计打卡',
+              metricValue: 0,
+              completedLevelCount: 0,
+              totalLevelCount: 7,
+              allCompleted: false,
+              currentLevel: {
+                key: 'total-checkin-1',
+                threshold: 1,
+                title: '初次点亮',
+                description: '完成第一次运动打卡',
+                badge: 'BRONZE',
+                completed: false,
+                isCurrent: true,
+                progress: { current: 0, displayCurrent: 0, target: 1, percent: 0 },
+              },
+              levels: [],
             },
           ],
           message: 'ok',
@@ -33,8 +44,10 @@ describe('achievements api', () => {
 
     await expect(getAchievements()).resolves.toMatchObject([
       {
-        key: 'checkin_first',
-        progress: { current: 0, target: 1, percent: 0 },
+        key: 'total-checkin',
+        currentLevel: {
+          progress: { current: 0, displayCurrent: 0, target: 1, percent: 0 },
+        },
       },
     ])
   })

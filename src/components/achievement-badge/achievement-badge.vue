@@ -1,153 +1,191 @@
 <script lang="ts" setup>
-import type { Achievement } from '@/api/achievements'
+import type { AchievementBadge, AchievementCategory, AchievementSeriesProgress } from '@/api/achievements'
+import { computed } from 'vue'
 
-defineProps<{
-  achievement: Achievement
-  variant?: 'list' | 'tile'
+const props = defineProps<{
+  series: AchievementSeriesProgress
 }>()
+
+defineEmits<{
+  select: [series: AchievementSeriesProgress]
+}>()
+
+type CardAccent = 'green' | 'blue' | 'orange' | 'pink' | 'gold' | 'purple'
+
+const categoryAccentMap: Record<AchievementCategory, CardAccent> = {
+  checkin: 'green',
+  streak: 'orange',
+  weight: 'blue',
+  profile: 'pink',
+}
+
+const badgeAccentMap: Record<AchievementBadge, CardAccent> = {
+  BRONZE: 'orange',
+  SILVER: 'blue',
+  GOLD: 'gold',
+  PLATINUM: 'purple',
+  DIAMOND: 'blue',
+}
+
+const categoryAccent = computed(() => categoryAccentMap[props.series.category])
+const badgeAccent = computed(() => badgeAccentMap[props.series.currentLevel.badge])
+const statusText = computed(() =>
+  props.series.allCompleted
+    ? '全部阶段已完成'
+    : `冲刺第 ${props.series.completedLevelCount + 1}/${props.series.totalLevelCount} 阶段`,
+)
 </script>
 
 <template>
   <view
-    class="achievement-badge"
-    :class="[
-      `accent-${achievement.accent}`,
-      `tier-${achievement.tier}`,
-      variant || 'list',
-      { unlocked: achievement.unlocked },
-    ]"
+    class="achievement-series-card"
+    :class="[`accent-${categoryAccent}`, `badge-${badgeAccent}`, { completed: series.allCompleted }]"
+    @click="$emit('select', series)"
   >
-    <app-icon
-      :name="achievement.icon"
-      :accent="achievement.accent"
-      :active="achievement.unlocked"
-      :size="variant === 'tile' ? 'sm' : 'md'"
-    />
-    <view class="badge-copy">
-      <view class="badge-head">
-        <text class="badge-name">{{ achievement.name }}</text>
-        <text class="badge-tier">{{ achievement.tier }}</text>
+    <view class="series-head">
+      <app-icon :name="series.icon" :accent="categoryAccent" :active="series.allCompleted" size="md" />
+      <view class="series-title-wrap">
+        <text class="series-name">{{ series.seriesName }}</text>
+        <text class="series-status">{{ statusText }}</text>
       </view>
-      <text class="badge-desc">{{ achievement.description }}</text>
-      <view class="progress-track">
-        <view class="progress-bar" :style="{ width: `${achievement.progress.percent}%` }" />
-      </view>
-      <text class="badge-progress numeric"> {{ achievement.progress.current }}/{{ achievement.progress.target }} </text>
+      <text class="series-chevron i-carbon-chevron-right" />
     </view>
-    <text v-if="achievement.unlocked" class="badge-state i-fit-badge" />
+
+    <view class="level-body">
+      <view class="level-head">
+        <text class="level-title">{{ series.currentLevel.title }}</text>
+        <text class="level-badge">{{ series.currentLevel.badge }}</text>
+      </view>
+      <text class="level-desc">{{ series.currentLevel.description }}</text>
+      <view class="progress-track">
+        <view class="progress-bar" :style="{ width: `${series.currentLevel.progress.percent}%` }" />
+      </view>
+      <view class="progress-meta">
+        <text class="progress-count numeric">
+          {{ series.currentLevel.progress.displayCurrent }}/{{ series.currentLevel.progress.target }}
+        </text>
+        <text class="stage-count numeric">
+          已完成 {{ series.completedLevelCount }}/{{ series.totalLevelCount }} 阶段
+        </text>
+      </view>
+    </view>
   </view>
 </template>
 
 <style scoped lang="scss">
-.achievement-badge {
+.achievement-series-card {
   --accent: var(--app-green);
   --accent-soft: var(--app-green-soft);
+  --badge-accent: var(--app-green);
+  --badge-soft: var(--app-green-soft);
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  min-height: 136rpx;
-  padding: 22rpx;
+  display: block;
+  min-height: 220rpx;
+  padding: 24rpx;
   border: 1rpx solid rgba(255, 255, 255, 0.68);
   border-radius: var(--app-card-radius);
   background: var(--app-surface);
   box-shadow: var(--app-shadow);
   box-sizing: border-box;
   overflow: hidden;
-  opacity: 0.72;
+  transition:
+    transform var(--app-motion-fast) var(--app-ease-out),
+    opacity var(--app-motion-fast) ease-out;
 }
 
-.achievement-badge.tile {
-  display: block;
-  min-height: 198rpx;
-  padding: 20rpx;
-  box-shadow: 0 6rpx 18rpx rgba(31, 88, 58, 0.045);
+.achievement-series-card:active {
+  opacity: 0.86;
+  transform: scale(0.985);
 }
 
-.achievement-badge.unlocked {
-  opacity: 1;
-}
-
-.achievement-badge.unlocked::after {
+.achievement-series-card.completed::after {
   position: absolute;
-  top: -40rpx;
-  bottom: -40rpx;
-  width: 56rpx;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  top: -50rpx;
+  bottom: -50rpx;
+  width: 58rpx;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26), transparent);
   content: '';
-  animation: shimmer 2.4s ease-in-out infinite;
+  animation: shimmer 2.6s ease-in-out infinite;
 }
 
-.badge-copy {
+.series-head,
+.level-head,
+.progress-meta {
+  display: flex;
+  align-items: center;
+}
+
+.series-head {
+  gap: 18rpx;
+}
+
+.series-title-wrap {
   flex: 1;
   min-width: 0;
 }
 
-.tile .badge-copy {
-  margin-top: 14rpx;
-}
-
-.badge-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-}
-
-.tile .badge-head {
+.series-name,
+.series-status,
+.level-title,
+.level-desc {
   display: block;
 }
 
-.badge-name {
+.series-name {
+  color: var(--app-label-primary);
+  font-size: 29rpx;
+  font-weight: 780;
+}
+
+.series-status {
+  margin-top: 5rpx;
+  color: var(--accent);
+  font-size: 21rpx;
+  font-weight: 680;
+}
+
+.series-chevron {
+  flex: 0 0 auto;
+  color: var(--app-label-tertiary);
+  font-size: 28rpx;
+}
+
+.level-body {
+  margin-top: 22rpx;
+}
+
+.level-head {
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.level-title {
   min-width: 0;
   color: var(--app-label-primary);
   font-size: 27rpx;
   font-weight: 760;
 }
 
-.tile .badge-name {
-  display: block;
-  min-height: 34rpx;
-  font-size: 25rpx;
-}
-
-.badge-tier {
+.level-badge {
   flex: 0 0 auto;
-  padding: 4rpx 12rpx;
+  padding: 5rpx 13rpx;
   border-radius: 999rpx;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--badge-accent);
+  background: var(--badge-soft);
   font-size: 18rpx;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-weight: 820;
 }
 
-.tile .badge-tier {
-  display: inline-block;
-  margin-top: 6rpx;
-  opacity: 0.74;
-}
-
-.badge-desc,
-.badge-progress {
+.level-desc {
+  margin-top: 8rpx;
   color: var(--app-label-secondary);
-}
-
-.badge-desc {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 21rpx;
-  line-height: 1.35;
-}
-
-.tile .badge-desc {
-  margin-top: 5rpx;
-  font-size: 19rpx;
+  font-size: 22rpx;
+  line-height: 1.36;
 }
 
 .progress-track {
-  height: 9rpx;
-  margin-top: 12rpx;
+  height: 10rpx;
+  margin-top: 18rpx;
   border-radius: 999rpx;
   background: var(--app-fill);
   overflow: hidden;
@@ -156,28 +194,64 @@ defineProps<{
 .progress-bar {
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--badge-accent);
   transition: width var(--app-motion-slow) var(--app-ease-out);
 }
 
-.badge-progress {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 19rpx;
-  text-align: right;
+.progress-meta {
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-top: 10rpx;
+  color: var(--app-label-secondary);
+  font-size: 20rpx;
 }
 
-.badge-state {
-  position: absolute;
-  right: 20rpx;
-  bottom: 18rpx;
-  color: var(--accent);
-  font-size: 28rpx;
+.progress-count {
+  color: var(--badge-accent);
+  font-weight: 760;
 }
 
-.tile .badge-state {
-  top: 24rpx;
-  right: 24rpx;
-  bottom: auto;
+.stage-count {
+  color: var(--app-label-tertiary);
+}
+
+.accent-green {
+  --accent: var(--app-green);
+  --accent-soft: var(--app-green-soft);
+}
+
+.accent-blue {
+  --accent: var(--app-blue);
+  --accent-soft: var(--app-blue-soft);
+}
+
+.accent-orange {
+  --accent: var(--app-orange);
+  --accent-soft: var(--app-orange-soft);
+}
+
+.accent-pink {
+  --accent: var(--app-pink);
+  --accent-soft: var(--app-pink-soft);
+}
+
+.badge-orange {
+  --badge-accent: var(--app-orange);
+  --badge-soft: var(--app-orange-soft);
+}
+
+.badge-blue {
+  --badge-accent: var(--app-blue);
+  --badge-soft: var(--app-blue-soft);
+}
+
+.badge-gold {
+  --badge-accent: var(--app-gold);
+  --badge-soft: var(--app-gold-soft);
+}
+
+.badge-purple {
+  --badge-accent: var(--app-purple);
+  --badge-soft: var(--app-purple-soft);
 }
 </style>

@@ -32,6 +32,180 @@ interface UploadedFile {
   data: Buffer
 }
 
+type AchievementCategory = 'checkin' | 'streak' | 'weight' | 'profile'
+type AchievementBadge = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND'
+type AchievementMetricKey = 'totalCheckinCount' | 'currentStreak' | 'weightRecordCount' | 'profileCompleted'
+type AchievementIcon = 'checkin' | 'streak' | 'weight' | 'profile'
+
+interface AchievementLevel {
+  threshold: number
+  title: string
+  description: string
+  badge: AchievementBadge
+}
+
+interface AchievementSeries {
+  key: string
+  category: AchievementCategory
+  metricKey: AchievementMetricKey
+  icon: AchievementIcon
+  seriesName: string
+  levels: AchievementLevel[]
+}
+
+const achievementSeriesList: AchievementSeries[] = [
+  {
+    key: 'total-checkin',
+    category: 'checkin',
+    metricKey: 'totalCheckinCount',
+    icon: 'checkin',
+    seriesName: '累计打卡',
+    levels: [
+      {
+        threshold: 1,
+        title: '初次点亮',
+        description: '完成第一次运动打卡',
+        badge: 'BRONZE',
+      },
+      {
+        threshold: 10,
+        title: '稳定起步',
+        description: '累计完成 10 次打卡',
+        badge: 'SILVER',
+      },
+      {
+        threshold: 30,
+        title: '习惯养成',
+        description: '累计完成 30 次打卡',
+        badge: 'GOLD',
+      },
+      {
+        threshold: 60,
+        title: '坚持进阶',
+        description: '累计完成 60 次打卡',
+        badge: 'PLATINUM',
+      },
+      {
+        threshold: 100,
+        title: '百次坚持',
+        description: '累计完成 100 次打卡',
+        badge: 'PLATINUM',
+      },
+      {
+        threshold: 200,
+        title: '运动达人',
+        description: '累计完成 200 次打卡',
+        badge: 'DIAMOND',
+      },
+      {
+        threshold: 365,
+        title: '年度习惯',
+        description: '累计完成 365 次打卡',
+        badge: 'DIAMOND',
+      },
+    ],
+  },
+  {
+    key: 'current-streak',
+    category: 'streak',
+    metricKey: 'currentStreak',
+    icon: 'streak',
+    seriesName: '连续打卡',
+    levels: [
+      {
+        threshold: 3,
+        title: '连续 3 天',
+        description: '连续 3 天保持运动打卡',
+        badge: 'BRONZE',
+      },
+      {
+        threshold: 7,
+        title: '一周不断',
+        description: '连续 7 天保持运动打卡',
+        badge: 'SILVER',
+      },
+      {
+        threshold: 14,
+        title: '双周节奏',
+        description: '连续 14 天保持运动打卡',
+        badge: 'GOLD',
+      },
+      {
+        threshold: 30,
+        title: '月度长燃',
+        description: '连续 30 天保持运动打卡',
+        badge: 'PLATINUM',
+      },
+      {
+        threshold: 60,
+        title: '长期坚持',
+        description: '连续 60 天保持运动打卡',
+        badge: 'DIAMOND',
+      },
+      {
+        threshold: 100,
+        title: '百日不坠',
+        description: '连续 100 天保持运动打卡',
+        badge: 'DIAMOND',
+      },
+    ],
+  },
+  {
+    key: 'weight-record',
+    category: 'weight',
+    metricKey: 'weightRecordCount',
+    icon: 'weight',
+    seriesName: '体重记录',
+    levels: [
+      {
+        threshold: 1,
+        title: '体重起点',
+        description: '记录第一次体重',
+        badge: 'BRONZE',
+      },
+      {
+        threshold: 7,
+        title: '趋势观察',
+        description: '累计记录 7 次体重',
+        badge: 'SILVER',
+      },
+      {
+        threshold: 30,
+        title: '身体档案',
+        description: '累计记录 30 次体重',
+        badge: 'GOLD',
+      },
+      {
+        threshold: 60,
+        title: '稳定追踪',
+        description: '累计记录 60 次体重',
+        badge: 'PLATINUM',
+      },
+      {
+        threshold: 100,
+        title: '长期记录',
+        description: '累计记录 100 次体重',
+        badge: 'DIAMOND',
+      },
+    ],
+  },
+  {
+    key: 'profile-complete',
+    category: 'profile',
+    metricKey: 'profileCompleted',
+    icon: 'profile',
+    seriesName: '个人资料',
+    levels: [
+      {
+        threshold: 1,
+        title: '资料完整',
+        description: '完善头像、昵称、性别、生日和身高',
+        badge: 'GOLD',
+      },
+    ],
+  },
+]
+
 const loginSchema = z.object({
   code: z.string().min(1),
 })
@@ -217,53 +391,48 @@ function calculateCurrentStreak(records: AppCheckIn[]) {
   return currentStreak
 }
 
-function calculateGoalStreak(records: AppCheckIn[], dailyGoal: number) {
-  const dailyCounts = records.reduce<Record<string, number>>((result, record) => {
-    const key = formatChinaDate(record.checkedAt)
-    result[key] = (result[key] || 0) + 1
-    return result
-  }, {})
-  let streak = 0
-  let cursor = getChinaDayRange().start
-
-  while ((dailyCounts[formatChinaDate(cursor)] || 0) >= dailyGoal) {
-    streak += 1
-    cursor = addChinaDays(cursor, -1)
-  }
-
-  return streak
-}
-
 function clampProgress(current: number, target: number) {
+  const displayCurrent = Math.min(Math.max(current, 0), target)
   return {
     current,
+    displayCurrent,
     target,
-    percent: target <= 0 ? 100 : Math.min(100, Math.round((current / target) * 100)),
+    percent: target <= 0 ? 100 : Math.min(100, Math.round((displayCurrent / target) * 100)),
   }
 }
 
-function buildAchievement(params: {
-  key: string
-  name: string
-  description: string
-  category: 'checkin' | 'streak' | 'weight' | 'profile'
-  tier: 'bronze' | 'silver' | 'gold' | 'platinum'
-  icon: 'checkin' | 'streak' | 'target' | 'weight' | 'profile' | 'badge'
-  accent: 'green' | 'blue' | 'orange' | 'pink' | 'gold'
-  current: number
-  target: number
-}) {
-  const progress = clampProgress(params.current, params.target)
+function buildAchievementSeriesProgress(series: AchievementSeries, metricValue: number) {
+  const levels = series.levels.map((level) => {
+    const progress = clampProgress(metricValue, level.threshold)
+    return {
+      key: `${series.key}-${level.threshold}`,
+      ...level,
+      completed: metricValue >= level.threshold,
+      isCurrent: false,
+      progress,
+    }
+  })
+  const currentLevelIndex = levels.findIndex((level) => !level.completed)
+  const allCompleted = currentLevelIndex === -1
+  const activeLevelIndex = allCompleted ? Math.max(levels.length - 1, 0) : currentLevelIndex
+  const nextLevels = levels.map((level, index) => ({
+    ...level,
+    isCurrent: index === activeLevelIndex,
+  }))
+  const completedLevelCount = nextLevels.filter((level) => level.completed).length
+
   return {
-    key: params.key,
-    name: params.name,
-    description: params.description,
-    category: params.category,
-    tier: params.tier,
-    icon: params.icon,
-    accent: params.accent,
-    unlocked: progress.percent >= 100,
-    progress,
+    key: series.key,
+    category: series.category,
+    metricKey: series.metricKey,
+    icon: series.icon,
+    seriesName: series.seriesName,
+    metricValue,
+    completedLevelCount,
+    totalLevelCount: nextLevels.length,
+    allCompleted,
+    currentLevel: nextLevels[activeLevelIndex],
+    levels: nextLevels,
   }
 }
 
@@ -275,183 +444,15 @@ function buildAchievements(params: {
   const { user, checkIns, weightCount } = params
   const totalCount = checkIns.length
   const currentStreak = calculateCurrentStreak(checkIns)
-  const dailyGoal = user.dailyGoal || 1
-  const todayRange = getChinaDayRange()
-  const todayCount = checkIns.filter(
-    (record) => record.checkedAt >= todayRange.start && record.checkedAt < todayRange.end,
-  ).length
-  const goalStreak = calculateGoalStreak(checkIns, dailyGoal)
   const profileFields = [user.nickname, user.avatarUrl, user.gender, user.birthday, toNumber(user.heightCm)]
-  const profileCompleted = profileFields.filter(Boolean).length
-  const hasTargetWeight = toNumber(user.targetWeightKg) !== null ? 1 : 0
+  const metrics: Record<AchievementMetricKey, number> = {
+    totalCheckinCount: totalCount,
+    currentStreak,
+    weightRecordCount: weightCount,
+    profileCompleted: profileFields.every(Boolean) ? 1 : 0,
+  }
 
-  return [
-    buildAchievement({
-      key: 'checkin_first',
-      name: '初次点亮',
-      description: '完成第一次运动打卡',
-      category: 'checkin',
-      tier: 'bronze',
-      icon: 'checkin',
-      accent: 'green',
-      current: totalCount,
-      target: 1,
-    }),
-    buildAchievement({
-      key: 'checkin_10',
-      name: '稳定起步',
-      description: '累计完成 10 次打卡',
-      category: 'checkin',
-      tier: 'silver',
-      icon: 'checkin',
-      accent: 'green',
-      current: totalCount,
-      target: 10,
-    }),
-    buildAchievement({
-      key: 'checkin_30',
-      name: '习惯养成',
-      description: '累计完成 30 次打卡',
-      category: 'checkin',
-      tier: 'gold',
-      icon: 'checkin',
-      accent: 'gold',
-      current: totalCount,
-      target: 30,
-    }),
-    buildAchievement({
-      key: 'checkin_100',
-      name: '百次坚持',
-      description: '累计完成 100 次打卡',
-      category: 'checkin',
-      tier: 'platinum',
-      icon: 'badge',
-      accent: 'gold',
-      current: totalCount,
-      target: 100,
-    }),
-    buildAchievement({
-      key: 'streak_3',
-      name: '连续 3 天',
-      description: '连续 3 天保持运动',
-      category: 'streak',
-      tier: 'bronze',
-      icon: 'streak',
-      accent: 'orange',
-      current: currentStreak,
-      target: 3,
-    }),
-    buildAchievement({
-      key: 'streak_7',
-      name: '一周不断',
-      description: '连续 7 天保持运动',
-      category: 'streak',
-      tier: 'silver',
-      icon: 'streak',
-      accent: 'orange',
-      current: currentStreak,
-      target: 7,
-    }),
-    buildAchievement({
-      key: 'streak_14',
-      name: '双周节奏',
-      description: '连续 14 天保持运动',
-      category: 'streak',
-      tier: 'gold',
-      icon: 'streak',
-      accent: 'gold',
-      current: currentStreak,
-      target: 14,
-    }),
-    buildAchievement({
-      key: 'streak_30',
-      name: '月度长燃',
-      description: '连续 30 天保持运动',
-      category: 'streak',
-      tier: 'platinum',
-      icon: 'streak',
-      accent: 'gold',
-      current: currentStreak,
-      target: 30,
-    }),
-    buildAchievement({
-      key: 'goal_today',
-      name: '今日达标',
-      description: '完成今天的打卡目标',
-      category: 'streak',
-      tier: 'bronze',
-      icon: 'target',
-      accent: 'blue',
-      current: todayCount,
-      target: dailyGoal,
-    }),
-    buildAchievement({
-      key: 'goal_streak_3',
-      name: '目标连击',
-      description: '连续 3 天完成每日目标',
-      category: 'streak',
-      tier: 'silver',
-      icon: 'target',
-      accent: 'blue',
-      current: goalStreak,
-      target: 3,
-    }),
-    buildAchievement({
-      key: 'weight_first',
-      name: '体重起点',
-      description: '记录第一次体重',
-      category: 'weight',
-      tier: 'bronze',
-      icon: 'weight',
-      accent: 'blue',
-      current: weightCount,
-      target: 1,
-    }),
-    buildAchievement({
-      key: 'weight_7',
-      name: '趋势观察',
-      description: '累计记录 7 次体重',
-      category: 'weight',
-      tier: 'silver',
-      icon: 'weight',
-      accent: 'blue',
-      current: weightCount,
-      target: 7,
-    }),
-    buildAchievement({
-      key: 'weight_30',
-      name: '身体档案',
-      description: '累计记录 30 次体重',
-      category: 'weight',
-      tier: 'gold',
-      icon: 'weight',
-      accent: 'gold',
-      current: weightCount,
-      target: 30,
-    }),
-    buildAchievement({
-      key: 'weight_target',
-      name: '目标设定',
-      description: '设置目标体重',
-      category: 'weight',
-      tier: 'bronze',
-      icon: 'target',
-      accent: 'pink',
-      current: hasTargetWeight,
-      target: 1,
-    }),
-    buildAchievement({
-      key: 'profile_complete',
-      name: '资料完整',
-      description: '完善昵称、头像、性别、生日和身高',
-      category: 'profile',
-      tier: 'gold',
-      icon: 'profile',
-      accent: 'pink',
-      current: profileCompleted,
-      target: profileFields.length,
-    }),
-  ]
+  return achievementSeriesList.map((series) => buildAchievementSeriesProgress(series, metrics[series.metricKey]))
 }
 
 function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
