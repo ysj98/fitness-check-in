@@ -834,7 +834,7 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .summary-grid :deep(.metric-card) {
-  min-height: 160rpx;
+  min-height: 260rpx;
 }
 
 .summary-grid :deep(.metric-note) {
