@@ -37,6 +37,12 @@ interface RecentDaySummary {
   isToday: boolean
 }
 
+interface RecordTouchStart {
+  id: number
+  x: number
+  y: number
+}
+
 const emptyStats: CheckInStatsRes = {
   currentStreak: 0,
   totalCount: 0,
@@ -55,6 +61,7 @@ const selectedMonth = ref(new Date())
 const selectedDateKey = ref(formatDateKey(new Date()))
 const recentExpanded = ref(false)
 const activeRecordActionId = ref<number | null>(null)
+const recordTouchStart = ref<RecordTouchStart | null>(null)
 const todayCount = ref(0)
 const todayRecords = ref<CheckInRecord[]>([])
 const recentRecords = ref<CheckInRecord[]>([])
@@ -237,6 +244,7 @@ async function handleDelete(record: CheckInRecord) {
     uni.showModal({
       title: '确认删除这条打卡记录吗？',
       content: '删除后无法恢复',
+      cancelText: '取消',
       confirmText: '删除',
       confirmColor: '#ff5a6e',
       success: (result) => resolve(result.confirm),
@@ -265,8 +273,36 @@ function selectCalendarDay(day: CalendarDay) {
   selectedDateKey.value = day.key
 }
 
-function toggleRecordActions(recordId: number) {
-  activeRecordActionId.value = activeRecordActionId.value === recordId ? null : recordId
+function handleRecordTouchStart(recordId: number, event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) {
+    return
+  }
+
+  recordTouchStart.value = {
+    id: recordId,
+    x: touch.clientX,
+    y: touch.clientY,
+  }
+}
+
+function handleRecordTouchEnd(recordId: number, event: TouchEvent) {
+  const start = recordTouchStart.value
+  const touch = event.changedTouches[0]
+  recordTouchStart.value = null
+
+  if (!start || start.id !== recordId || !touch) {
+    return
+  }
+
+  const deltaX = touch.clientX - start.x
+  const deltaY = touch.clientY - start.y
+
+  if (Math.abs(deltaX) < 34 || Math.abs(deltaX) < Math.abs(deltaY)) {
+    return
+  }
+
+  activeRecordActionId.value = deltaX < 0 ? recordId : null
 }
 
 function getMonthKey(date = new Date()) {
@@ -382,31 +418,22 @@ function formatTime(value: string) {
           class="record-row"
           :class="{ 'actions-open': activeRecordActionId === record.id }"
           :style="{ animationDelay: `${index * 35}ms` }"
+          @touchstart="handleRecordTouchStart(record.id, $event)"
+          @touchend="handleRecordTouchEnd(record.id, $event)"
         >
-          <app-icon name="checkin" accent="green" size="sm" active />
-          <view class="record-main">
-            <text class="record-title">运动打卡</text>
-            <text class="record-detail">
-              {{ formatTime(record.checkedAt) }}
-            </text>
-          </view>
-          <view class="record-menu">
-            <button
-              class="more-action"
-              aria-label="更多操作"
-              hover-class="row-action-pressed"
-              @click="toggleRecordActions(record.id)"
-            >
-              <text class="i-carbon-overflow-menu-horizontal" />
-            </button>
-            <button
-              v-if="activeRecordActionId === record.id"
-              class="row-action danger"
-              hover-class="row-action-pressed"
-              @click="handleDelete(record)"
-            >
+          <view class="record-delete-track">
+            <button class="record-delete-button" hover-class="record-delete-pressed" @click.stop="handleDelete(record)">
               删除
             </button>
+          </view>
+          <view class="record-content">
+            <app-icon name="checkin" accent="green" size="sm" active />
+            <view class="record-main">
+              <text class="record-title">运动打卡</text>
+              <text class="record-detail">
+                {{ formatTime(record.checkedAt) }}
+              </text>
+            </view>
           </view>
         </view>
       </app-card>
@@ -415,13 +442,8 @@ function formatTime(value: string) {
     <text class="ios-section-title">最近 7 天</text>
     <view class="record-card-shell">
       <app-card class="record-card" accent="orange" :show-accent="false">
-        <view v-if="recentRecords.length === 0" class="empty-state">
-          <app-icon name="streak" accent="orange" size="md" />
-          <text>持续运动后，时间线会在这里生长。</text>
-        </view>
         <view
           v-for="day in visibleRecentDaySummaries"
-          v-else
           :key="day.key"
           class="recent-row"
           :class="{ muted: day.count === 0 }"
@@ -440,12 +462,12 @@ function formatTime(value: string) {
           </text>
         </view>
         <button
-          v-if="recentRecords.length > 0"
+          v-if="recentDaySummaries.length > 3"
           class="recent-toggle"
           hover-class="recent-toggle-pressed"
           @click="recentExpanded = !recentExpanded"
         >
-          {{ recentExpanded ? '收起' : '展开全部' }}
+          {{ recentExpanded ? '收起最近 7 天' : '展开最近 7 天' }}
         </button>
       </app-card>
     </view>
@@ -597,8 +619,7 @@ function formatTime(value: string) {
     opacity var(--app-motion-fast) ease-out;
 }
 
-.icon-button-pressed,
-.row-action-pressed {
+.icon-button-pressed {
   opacity: 0.7;
   transform: scale(0.94);
 }
@@ -756,12 +777,60 @@ function formatTime(value: string) {
 }
 
 .record-row {
-  gap: 18rpx;
+  display: block;
+  overflow: hidden;
+  padding-right: 0;
+  padding-top: 0;
+  padding-bottom: 0;
   animation: app-enter 230ms ease-out both;
 }
 
-.record-row.actions-open {
+.record-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
   align-items: center;
+  min-height: 106rpx;
+  gap: 18rpx;
+  padding: 18rpx 24rpx 18rpx 0;
+  background: var(--app-surface);
+  box-sizing: border-box;
+  transition: transform 220ms var(--app-ease-out);
+}
+
+.record-row.actions-open .record-content {
+  transform: translateX(-128rpx);
+}
+
+.record-delete-track {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 1rpx;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  width: 128rpx;
+}
+
+.record-delete-button {
+  width: 108rpx;
+  height: 100%;
+  padding: 0;
+  border-radius: 0;
+  color: #fff;
+  background: var(--app-red);
+  font-size: 24rpx;
+  font-weight: 760;
+  line-height: 106rpx;
+  transition:
+    opacity var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) ease-out;
+}
+
+.record-delete-pressed {
+  opacity: 0.82;
 }
 
 .record-main {
@@ -786,57 +855,9 @@ function formatTime(value: string) {
   font-size: 22rpx;
 }
 
-.record-menu {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.more-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52rpx;
-  height: 48rpx;
-  padding: 0;
-  border-radius: 14rpx;
-  color: var(--app-label-tertiary);
-  background: transparent;
-  font-size: 28rpx;
-  line-height: 48rpx;
-  transition:
-    transform var(--app-motion-fast) ease-out,
-    opacity var(--app-motion-fast) ease-out,
-    background-color var(--app-motion-fast) ease-out;
-}
-
-.actions-open .more-action {
-  color: var(--app-label-secondary);
-  background: var(--app-fill);
-}
-
-.row-action {
-  min-width: 68rpx;
-  height: 48rpx;
-  padding: 0 12rpx;
-  border-radius: 14rpx;
-  color: rgba(255, 90, 110, 0.72);
-  background: rgba(255, 90, 110, 0.08);
-  font-size: 21rpx;
-  line-height: 48rpx;
-  transition:
-    transform var(--app-motion-fast) ease-out,
-    opacity var(--app-motion-fast) ease-out;
-}
-
 .recent-row {
   justify-content: flex-start;
   min-height: 92rpx;
-}
-
-.recent-row.muted {
-  opacity: 0.72;
 }
 
 .timeline-marker {
@@ -875,6 +896,7 @@ function formatTime(value: string) {
 .timeline-dot.empty {
   border-color: var(--app-surface-tertiary);
   background: var(--app-label-tertiary);
+  opacity: 0.52;
 }
 
 .recent-copy {
@@ -896,6 +918,11 @@ function formatTime(value: string) {
 .recent-row.muted .recent-time {
   color: var(--app-label-tertiary);
   font-size: 21rpx;
+}
+
+.recent-row.muted .recent-date,
+.recent-row.muted .recent-event {
+  color: var(--app-label-tertiary);
 }
 
 .recent-toggle {
