@@ -97,11 +97,6 @@ const calendarStartOffset = computed(() => {
   return day === 0 ? 6 : day - 1
 })
 
-const goalText = computed(() => {
-  const goal = checkInStats.value.todayGoal || 1
-  return `已完成 ${Math.min(todayCount.value, goal)}/${goal}`
-})
-
 const checkInButtonText = computed(() => {
   if (checking.value) {
     return '打卡中...'
@@ -299,14 +294,6 @@ function formatTime(value: string) {
     <view class="energy-card-shell">
       <app-card accent="green" elevated>
         <view class="energy-card-content" :class="{ pulse: successPulse }">
-          <view class="goal-panel">
-            <view>
-              <text class="goal-caption">今日目标</text>
-              <text class="goal-status">{{ goalText }}</text>
-            </view>
-            <text class="goal-fraction numeric"> {{ todayCount }}/{{ checkInStats.todayGoal || 1 }} </text>
-          </view>
-
           <view class="checkin-action">
             <button
               class="checkin-button"
@@ -501,7 +488,6 @@ function formatTime(value: string) {
   animation: success-pop 320ms var(--app-ease-spring) both;
 }
 
-.goal-panel,
 .calendar-head,
 .record-row,
 .recent-row,
@@ -510,8 +496,6 @@ function formatTime(value: string) {
   align-items: center;
 }
 
-.goal-caption,
-.goal-status,
 .record-detail,
 .recent-time,
 .recent-event,
@@ -519,39 +503,9 @@ function formatTime(value: string) {
   color: var(--app-label-secondary);
 }
 
-.goal-caption {
-  display: block;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.goal-panel {
-  justify-content: space-between;
-  gap: 24rpx;
-  padding: 24rpx 26rpx;
-  border-radius: 24rpx;
-  background: var(--app-fill);
-}
-
-.goal-status,
-.goal-fraction {
-  display: block;
-}
-
-.goal-status {
-  margin-top: 4rpx;
-  font-size: 23rpx;
-}
-
-.goal-fraction {
-  color: var(--app-green);
-  font-size: 38rpx;
-  font-weight: 820;
-}
-
 .checkin-action {
   position: relative;
-  margin-top: 30rpx;
+  margin-top: 0;
 }
 
 .checkin-summary {
