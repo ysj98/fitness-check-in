@@ -85,6 +85,9 @@ const backfillSheetOpen = ref(false)
 const backfilling = ref(false)
 const selectedBackfillDateKey = ref('')
 const selectedBackfillReason = ref<BackfillReason>('忘记打卡')
+const selectedBackfillSportType = ref<SportType>('散步')
+const selectedBackfillDurationOption = ref<number | 'custom'>(30)
+const customBackfillDuration = ref('')
 const selectedBackfillQuota = ref({ used: 0, limit: 3 })
 const todayCount = ref(0)
 const todayRecords = ref<CheckInRecord[]>([])
@@ -358,12 +361,19 @@ function selectDurationOption(value: number | 'custom') {
   }
 }
 
-function resolveDurationMinutes() {
-  if (typeof selectedDurationOption.value === 'number') {
-    return selectedDurationOption.value
+function selectBackfillDurationOption(value: number | 'custom') {
+  selectedBackfillDurationOption.value = value
+  if (value !== 'custom') {
+    customBackfillDuration.value = ''
+  }
+}
+
+function resolveDurationMinutes(option: number | 'custom', customValue: string) {
+  if (typeof option === 'number') {
+    return option
   }
 
-  const value = customDuration.value.trim()
+  const value = customValue.trim()
   if (!value) {
     uni.showToast({ title: '请输入运动时长', icon: 'none' })
     return null
@@ -386,7 +396,7 @@ async function handleConfirmCheckIn() {
     return
   }
 
-  const durationMinutes = resolveDurationMinutes()
+  const durationMinutes = resolveDurationMinutes(selectedDurationOption.value, customDuration.value)
   if (!durationMinutes) {
     return
   }
@@ -481,6 +491,13 @@ async function openBackfillSheet(dateKey: string) {
 
   selectedBackfillDateKey.value = dateKey
   selectedBackfillReason.value = '忘记打卡'
+  const preference = getStoredCheckInPreference()
+  selectedBackfillSportType.value = preference.sportType
+  selectedBackfillDurationOption.value = durationOptions.includes(preference.durationMinutes)
+    ? preference.durationMinutes
+    : 'custom'
+  customBackfillDuration.value =
+    selectedBackfillDurationOption.value === 'custom' ? String(preference.durationMinutes) : ''
   selectedBackfillQuota.value = {
     used: targetMonthStats.backfillUsed,
     limit: targetMonthStats.backfillLimit,
@@ -500,10 +517,21 @@ async function handleConfirmBackfill() {
     return
   }
 
+  const durationMinutes = resolveDurationMinutes(selectedBackfillDurationOption.value, customBackfillDuration.value)
+  if (!durationMinutes) {
+    return
+  }
+
   backfilling.value = true
   try {
     const dateKey = selectedBackfillDateKey.value
-    await createBackfillCheckIn(dateKey, selectedBackfillReason.value)
+    await createBackfillCheckIn({
+      date: dateKey,
+      reason: selectedBackfillReason.value,
+      sportType: selectedBackfillSportType.value,
+      durationMinutes,
+    })
+    saveCheckInPreference(selectedBackfillSportType.value, durationMinutes)
     const targetDate = parseDateKey(dateKey)
     selectedMonth.value = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
     backfillSheetOpen.value = false
@@ -868,6 +896,54 @@ function formatTime(value: string) {
           <text class="backfill-info-value">{{ selectedBackfillDateText }}</text>
         </view>
         <text class="backfill-note">补签后，该日期将计入月度热力、连续打卡和成就统计。</text>
+        <view class="backfill-field">
+          <text class="backfill-field-title">运动类型</text>
+          <view class="sheet-option-grid sport-options">
+            <button
+              v-for="type in sportTypes"
+              :key="type"
+              class="sheet-option"
+              :class="{ active: selectedBackfillSportType === type }"
+              hover-class="sheet-option-pressed"
+              @click.stop="selectedBackfillSportType = type"
+            >
+              {{ type }}
+            </button>
+          </view>
+        </view>
+        <view class="backfill-field">
+          <text class="backfill-field-title">运动时长</text>
+          <view class="sheet-option-grid duration-options">
+            <button
+              v-for="minutes in durationOptions"
+              :key="minutes"
+              class="sheet-option"
+              :class="{ active: selectedBackfillDurationOption === minutes }"
+              hover-class="sheet-option-pressed"
+              @click.stop="selectBackfillDurationOption(minutes)"
+            >
+              {{ minutes }} 分钟
+            </button>
+            <button
+              class="sheet-option"
+              :class="{ active: selectedBackfillDurationOption === 'custom' }"
+              hover-class="sheet-option-pressed"
+              @click.stop="selectBackfillDurationOption('custom')"
+            >
+              自定义
+            </button>
+          </view>
+          <view v-if="selectedBackfillDurationOption === 'custom'" class="custom-duration-row">
+            <input
+              v-model="customBackfillDuration"
+              class="custom-duration-input numeric"
+              type="number"
+              :maxlength="3"
+              placeholder="请输入分钟数"
+            />
+            <text class="custom-duration-unit">分钟</text>
+          </view>
+        </view>
         <view class="backfill-field">
           <text class="backfill-field-title">补签原因</text>
           <view class="reason-options">

@@ -41,7 +41,12 @@ describe('checkins api', () => {
     vi.mocked(uni.request).mockImplementationOnce((options) => {
       expect(options.url).toBe('/api/checkins/backfill')
       expect(options.method).toBe('POST')
-      expect(options.data).toEqual({ date: '2026-06-26', reason: '忘记打卡' })
+      expect(options.data).toEqual({
+        date: '2026-06-26',
+        reason: '忘记打卡',
+        sportType: '游泳',
+        durationMinutes: 60,
+      })
       options.success?.({
         cookies: [],
         data: {
@@ -51,8 +56,8 @@ describe('checkins api', () => {
             checkedAt: '2026-06-26T04:00:00.000Z',
             isBackfill: true,
             backfillReason: '忘记打卡',
-            sportType: '其他',
-            durationMinutes: 30,
+            sportType: '游泳',
+            durationMinutes: 60,
           },
           message: 'ok',
         },
@@ -62,13 +67,20 @@ describe('checkins api', () => {
       return {} as UniApp.RequestTask
     })
 
-    await expect(createBackfillCheckIn('2026-06-26', '忘记打卡')).resolves.toEqual({
+    await expect(
+      createBackfillCheckIn({
+        date: '2026-06-26',
+        reason: '忘记打卡',
+        sportType: '游泳',
+        durationMinutes: 60,
+      }),
+    ).resolves.toEqual({
       id: 2,
       checkedAt: '2026-06-26T04:00:00.000Z',
       isBackfill: true,
       backfillReason: '忘记打卡',
-      sportType: '其他',
-      durationMinutes: 30,
+      sportType: '游泳',
+      durationMinutes: 60,
     })
   })
 })

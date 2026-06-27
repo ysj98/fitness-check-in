@@ -377,13 +377,15 @@ describe('fitness check-in api', () => {
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date, reason: '已运动未记录' },
+      payload: { date, reason: '已运动未记录', sportType: '跑步', durationMinutes: 45 },
     })
 
     expect(response.statusCode).toBe(200)
     expect(response.json().data).toMatchObject({
       isBackfill: true,
       backfillReason: '已运动未记录',
+      sportType: '跑步',
+      durationMinutes: 45,
     })
 
     const monthResponse = await app.inject({
@@ -421,31 +423,31 @@ describe('fitness check-in api', () => {
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date: today, reason: '忘记打卡' },
+      payload: { date: today, reason: '忘记打卡', sportType: '散步', durationMinutes: 30 },
     })
     const futureResponse = await app.inject({
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date: future, reason: '忘记打卡' },
+      payload: { date: future, reason: '忘记打卡', sportType: '散步', durationMinutes: 30 },
     })
     const oldResponse = await app.inject({
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date: tooOld, reason: '忘记打卡' },
+      payload: { date: tooOld, reason: '忘记打卡', sportType: '散步', durationMinutes: 30 },
     })
     const existingResponse = await app.inject({
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date: yesterday, reason: '忘记打卡' },
+      payload: { date: yesterday, reason: '忘记打卡', sportType: '散步', durationMinutes: 30 },
     })
     const limitResponse = await app.inject({
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date: chinaDateKeyForOffset(5), reason: '忘记打卡' },
+      payload: { date: chinaDateKeyForOffset(5), reason: '忘记打卡', sportType: '散步', durationMinutes: 30 },
     })
 
     expect(todayResponse.statusCode).toBe(400)
@@ -472,7 +474,7 @@ describe('fitness check-in api', () => {
       method: 'POST',
       url: '/api/checkins/backfill',
       headers: authorization,
-      payload: { date: chinaDateKeyForOffset(1), reason: '忘记打卡' },
+      payload: { date: chinaDateKeyForOffset(1), reason: '忘记打卡', sportType: '瑜伽', durationMinutes: 60 },
     })
 
     const response = await app.inject({

@@ -30,6 +30,11 @@ export interface CreateCheckInPayload {
   durationMinutes: number
 }
 
+export interface CreateBackfillCheckInPayload extends CreateCheckInPayload {
+  date: string
+  reason: BackfillReason
+}
+
 export interface CheckInBadge {
   key: string
   name: string
@@ -53,8 +58,8 @@ export function createCheckIn(payload: CreateCheckInPayload) {
   return http.post<CheckInRecord>('/api/checkins', payload)
 }
 
-export function createBackfillCheckIn(date: string, reason: BackfillReason) {
-  return http.post<CheckInRecord>('/api/checkins/backfill', { date, reason })
+export function createBackfillCheckIn(payload: CreateBackfillCheckInPayload) {
+  return http.post<CheckInRecord>('/api/checkins/backfill', payload)
 }
 
 export function getRecentCheckIns(limit = 20) {

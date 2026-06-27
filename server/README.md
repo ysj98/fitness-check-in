@@ -205,7 +205,9 @@ pm2 start ecosystem.config.cjs --env production
 ```json
 {
   "date": "2026-06-26",
-  "reason": "忘记打卡"
+  "reason": "忘记打卡",
+  "sportType": "跑步",
+  "durationMinutes": 45
 }
 ```
 
@@ -217,6 +219,7 @@ pm2 start ecosystem.config.cjs --env production
 - 每个自然月最多补签 3 次。
 - 补签成功后计入月度热力、最近 7 天、连续打卡、累计打卡和成就统计。
 - `reason` 支持 `忘记打卡`、`已运动未记录`、`其他`。
+- `sportType` 和 `durationMinutes` 规则与正常打卡一致。
 
 `GET /api/checkins/month?month=YYYY-MM` 会额外返回补签统计：
 

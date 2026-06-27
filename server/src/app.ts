@@ -231,6 +231,8 @@ const backfillReasonSchema = z.enum(['忘记打卡', '已运动未记录', '其�
 const backfillCheckInSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason: backfillReasonSchema.default('忘记打卡'),
+  sportType: sportTypeSchema,
+  durationMinutes: durationMinutesSchema,
 })
 
 const weightValueSchema = z.coerce.number().min(20).max(300)
@@ -1023,8 +1025,8 @@ export async function createApp(options: CreateAppOptions) {
         checkedAt: new Date(targetRange.start.getTime() + 12 * 60 * 60 * 1000),
         isBackfill: true,
         backfillReason: body.reason,
-        sportType: '其他',
-        durationMinutes: 30,
+        sportType: body.sportType,
+        durationMinutes: body.durationMinutes,
       },
     })
 
