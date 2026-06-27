@@ -62,10 +62,10 @@ function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; w
           userId: args.data.userId,
           checkedAt: args.data.checkedAt,
           createdAt: new Date(),
-          isBackfill: Boolean(args.data.isBackfill),
-          backfillReason: args.data.backfillReason || null,
-          sportType: args.data.sportType || '其他',
-          durationMinutes: args.data.durationMinutes || 30,
+          isBackfill: args.data.isBackfill,
+          backfillReason: args.data.backfillReason,
+          sportType: args.data.sportType,
+          durationMinutes: args.data.durationMinutes,
         }
         checkIns.push(record)
         return record
@@ -148,7 +148,7 @@ function matchWhere(record: AppCheckIn, where: any) {
   if (where.id !== undefined && record.id !== where.id) {
     return false
   }
-  if (where.isBackfill !== undefined && Boolean(record.isBackfill) !== where.isBackfill) {
+  if (where.isBackfill !== undefined && record.isBackfill !== where.isBackfill) {
     return false
   }
   if (where.checkedAt?.gte && record.checkedAt < where.checkedAt.gte) {
@@ -185,19 +185,35 @@ async function login(app: Awaited<ReturnType<typeof createApp>>, code = 'code-1'
   return response.json().data as { token: string; user: { userId: number } }
 }
 
+function createCheckInRecord(params: {
+  id: number
+  userId: number
+  checkedAt: Date
+  isBackfill?: boolean
+  backfillReason?: string | null
+  sportType?: string
+  durationMinutes?: number
+}): AppCheckIn {
+  return {
+    id: params.id,
+    userId: params.userId,
+    checkedAt: params.checkedAt,
+    createdAt: params.checkedAt,
+    isBackfill: params.isBackfill ?? false,
+    backfillReason: params.backfillReason ?? null,
+    sportType: params.sportType ?? '其他',
+    durationMinutes: params.durationMinutes ?? 30,
+  }
+}
+
 function checkInAtChinaDay(userId: number, dayOffset: number, id: number): AppCheckIn {
   const checkedAt = new Date(getChinaDayRange().start.getTime() - dayOffset * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000)
 
-  return {
-    id,
+  return createCheckInRecord({
     userId,
+    id,
     checkedAt,
-    createdAt: checkedAt,
-    isBackfill: false,
-    backfillReason: null,
-    sportType: '其他',
-    durationMinutes: 30,
-  }
+  })
 }
 
 function chinaDateKeyForOffset(dayOffset: number) {
@@ -326,8 +342,16 @@ describe('fitness check-in api', () => {
     })
     const session = await login(app)
     db.checkIns.push(
-      { id: 1, userId: session.user.userId, checkedAt: new Date('2026-06-01T01:00:00.000Z'), createdAt: new Date() },
-      { id: 2, userId: session.user.userId, checkedAt: new Date('2026-06-01T02:00:00.000Z'), createdAt: new Date() },
+      createCheckInRecord({
+        id: 1,
+        userId: session.user.userId,
+        checkedAt: new Date('2026-06-01T01:00:00.000Z'),
+      }),
+      createCheckInRecord({
+        id: 2,
+        userId: session.user.userId,
+        checkedAt: new Date('2026-06-01T02:00:00.000Z'),
+      }),
     )
 
     const response = await app.inject({
@@ -468,7 +492,7 @@ describe('fitness check-in api', () => {
     })
     const first = await login(app, 'first')
     const second = await login(app, 'second')
-    db.checkIns.push({ id: 1, userId: first.user.id, checkedAt: new Date(), createdAt: new Date() })
+    db.checkIns.push(createCheckInRecord({ id: 1, userId: first.user.id, checkedAt: new Date() }))
 
     const response = await app.inject({
       method: 'DELETE',
@@ -545,6 +569,35 @@ describe('fitness check-in api', () => {
     expect(response.json().data.gender).toBe('other')
     expect(response.json().data.birthday).toBe('1995-05-20')
     expect(response.json().data.dailyGoal).toBe(3)
+  })
+
+  it('normalizes empty optional profile fields to null', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: { authorization: `Bearer ${session.token}` },
+      payload: {
+        nickname: 'Alex',
+        avatarUrl: '',
+        gender: '',
+        birthday: '',
+        dailyGoal: 3,
+      },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(db.users[0]).toMatchObject({
+      avatarUrl: null,
+      gender: null,
+      birthday: null,
+    })
   })
 
   it('rejects invalid daily goal', async () => {

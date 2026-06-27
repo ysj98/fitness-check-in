@@ -1,3 +1,0 @@
-ALTER TABLE `users`
-  ADD COLUMN `gender` VARCHAR(20) NULL,
-  ADD COLUMN `birthday` VARCHAR(10) NULL;

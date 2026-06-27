@@ -213,9 +213,9 @@ async function saveProfile() {
   try {
     const userInfo = await updateUserProfile({
       nickname: form.nickname.trim(),
-      avatarUrl: form.avatarUrl.trim(),
-      gender: form.gender,
-      birthday: form.birthday,
+      avatarUrl: form.avatarUrl.trim() || null,
+      gender: form.gender || null,
+      birthday: form.birthday || null,
       dailyGoal: form.dailyGoal,
       heightCm,
     })

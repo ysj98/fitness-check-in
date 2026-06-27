@@ -3,9 +3,9 @@ import { http } from '@/http/http'
 
 export interface IUserProfileUpdate {
   nickname: string
-  avatarUrl?: string
-  gender?: string
-  birthday?: string
+  avatarUrl?: string | null
+  gender?: string | null
+  birthday?: string | null
   dailyGoal?: number
   heightCm?: number | null
 }

@@ -44,10 +44,10 @@ model CheckIn {
   userId          Int
   checkedAt       DateTime @default(now())
   createdAt       DateTime @default(now())
-  isBackfill      Boolean  @default(false)
+  isBackfill      Boolean
   backfillReason  String?  @db.VarChar(32)
-  sportType       String   @default("其他") @db.VarChar(16)
-  durationMinutes Int      @default(30)
+  sportType       String   @db.VarChar(16)
+  durationMinutes Int
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, checkedAt])

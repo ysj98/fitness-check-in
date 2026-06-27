@@ -18,10 +18,10 @@ export interface AppCheckIn {
   userId: number
   checkedAt: Date
   createdAt: Date
-  isBackfill?: boolean
+  isBackfill: boolean
   backfillReason?: string | null
-  sportType?: string
-  durationMinutes?: number
+  sportType: string
+  durationMinutes: number
 }
 
 export interface AppWeightRecord {

@@ -161,7 +161,7 @@ const checkInSummaryText = computed(() => {
 })
 
 const todayTotalDuration = computed(() =>
-  todayRecords.value.reduce((total, record) => total + (record.durationMinutes || 0), 0),
+  todayRecords.value.reduce((total, record) => total + record.durationMinutes, 0),
 )
 
 const recentDaySummaries = computed<RecentDaySummary[]>(() => {
@@ -183,7 +183,7 @@ const recentDaySummaries = computed<RecentDaySummary[]>(() => {
       (left, right) => new Date(right.checkedAt).getTime() - new Date(left.checkedAt).getTime(),
     )
     const count = records.length
-    const durationMinutes = records.reduce((total, record) => total + (record.durationMinutes || 0), 0)
+    const durationMinutes = records.reduce((total, record) => total + record.durationMinutes, 0)
     return {
       key,
       label: index === 0 ? '今天' : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,

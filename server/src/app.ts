@@ -256,15 +256,20 @@ const weightSettingsSchema = z.object({
   weightUnit: z.enum(['kg', 'jin']).optional(),
 })
 
+const emptyStringToNull = (value: unknown) => (value === '' ? null : value)
+
 const profileSchema = z.object({
   nickname: z.string().trim().min(1).max(30),
-  avatarUrl: z.string().trim().max(500).optional().nullable(),
-  gender: z.enum(['male', 'female', 'other']).optional().nullable(),
-  birthday: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .nullable(),
+  avatarUrl: z.preprocess(emptyStringToNull, z.string().trim().max(500).optional().nullable()),
+  gender: z.preprocess(emptyStringToNull, z.enum(['male', 'female', 'other']).optional().nullable()),
+  birthday: z.preprocess(
+    emptyStringToNull,
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
+  ),
   dailyGoal: z.coerce.number().int().min(1).max(9).optional(),
   heightCm: heightValueSchema.optional().nullable(),
 })
@@ -326,10 +331,10 @@ function serializeCheckInRecord(record: AppCheckIn) {
   return {
     id: record.id,
     checkedAt: record.checkedAt.toISOString(),
-    isBackfill: Boolean(record.isBackfill),
-    backfillReason: record.backfillReason || '',
-    sportType: record.sportType || '其他',
-    durationMinutes: record.durationMinutes || 30,
+    isBackfill: record.isBackfill,
+    backfillReason: record.backfillReason ?? '',
+    sportType: record.sportType,
+    durationMinutes: record.durationMinutes,
   }
 }
 
@@ -960,6 +965,8 @@ export async function createApp(options: CreateAppOptions) {
       data: {
         userId: request.user.userId,
         checkedAt: new Date(),
+        isBackfill: false,
+        backfillReason: null,
         sportType: body.sportType,
         durationMinutes: body.durationMinutes,
       },
@@ -1016,6 +1023,8 @@ export async function createApp(options: CreateAppOptions) {
         checkedAt: new Date(targetRange.start.getTime() + 12 * 60 * 60 * 1000),
         isBackfill: true,
         backfillReason: body.reason,
+        sportType: '其他',
+        durationMinutes: 30,
       },
     })
 
