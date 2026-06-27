@@ -40,6 +40,8 @@ interface RecentDaySummary {
   label: string
   count: number
   durationMinutes: number
+  contentText: string
+  sideText: string
   isToday: boolean
   isBackfilled: boolean
   canBackfill: boolean
@@ -163,21 +165,12 @@ const todayTotalDuration = computed(() =>
 )
 
 const recentDaySummaries = computed<RecentDaySummary[]>(() => {
-  const countMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
+  const recordMap = recentRecords.value.reduce<Record<string, CheckInRecord[]>>((result, record) => {
     const key = formatDateKey(new Date(record.checkedAt))
-    result[key] = (result[key] || 0) + 1
-    return result
-  }, {})
-  const durationMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
-    const key = formatDateKey(new Date(record.checkedAt))
-    result[key] = (result[key] || 0) + (record.durationMinutes || 0)
-    return result
-  }, {})
-  const backfillMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
-    if (record.isBackfill) {
-      const key = formatDateKey(new Date(record.checkedAt))
-      result[key] = (result[key] || 0) + 1
+    if (!result[key]) {
+      result[key] = []
     }
+    result[key].push(record)
     return result
   }, {})
   const today = new Date()
@@ -186,14 +179,20 @@ const recentDaySummaries = computed<RecentDaySummary[]>(() => {
     const date = new Date(today)
     date.setDate(today.getDate() - index)
     const key = formatDateKey(date)
-    const count = countMap[key] || 0
+    const records = (recordMap[key] || []).sort(
+      (left, right) => new Date(right.checkedAt).getTime() - new Date(left.checkedAt).getTime(),
+    )
+    const count = records.length
+    const durationMinutes = records.reduce((total, record) => total + (record.durationMinutes || 0), 0)
     return {
       key,
       label: index === 0 ? '今天' : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
       count,
-      durationMinutes: durationMap[key] || 0,
+      durationMinutes,
+      contentText: formatRecentDayContent(records, durationMinutes),
+      sideText: formatRecentDaySide(records.length, durationMinutes),
       isToday: index === 0,
-      isBackfilled: (backfillMap[key] || 0) > 0,
+      isBackfilled: records.some((record) => record.isBackfill),
       canBackfill: getBackfillDisabledReason(key, count, monthStats.value, false) === '',
     }
   })
@@ -598,6 +597,24 @@ function formatDateText(dateKey: string) {
   return `${year}年${month}月${day}日`
 }
 
+function formatRecentDayContent(records: CheckInRecord[], durationMinutes: number) {
+  if (records.length === 0) {
+    return '未打卡'
+  }
+  if (records.length === 1) {
+    const [record] = records
+    return `${record.isBackfill ? '补签打卡' : record.sportType} · ${record.durationMinutes} 分钟`
+  }
+  return `运动 ${records.length} 次 · ${durationMinutes} 分钟`
+}
+
+function formatRecentDaySide(count: number, durationMinutes: number) {
+  if (count === 0) {
+    return ''
+  }
+  return count === 1 ? '1 次' : `${durationMinutes} 分钟`
+}
+
 function pad(value: number) {
   return value.toString().padStart(2, '0')
 }
@@ -749,9 +766,7 @@ function formatTime(value: string) {
           </view>
           <view class="recent-copy">
             <text class="recent-date">{{ day.label }}</text>
-            <text class="recent-event">
-              {{ day.count > 0 ? (day.isBackfilled ? '补签打卡' : '运动打卡') : '未打卡' }}
-            </text>
+            <text class="recent-event">{{ day.contentText }}</text>
           </view>
           <button
             v-if="day.canBackfill"
@@ -761,8 +776,8 @@ function formatTime(value: string) {
           >
             补签
           </button>
-          <text v-else class="recent-time numeric">
-            {{ day.count > 0 ? `${day.count} 次 · ${day.durationMinutes} 分钟` : '未完成' }}
+          <text v-else-if="day.sideText" class="recent-time numeric">
+            {{ day.sideText }}
           </text>
         </view>
         <button
@@ -771,7 +786,7 @@ function formatTime(value: string) {
           hover-class="recent-toggle-pressed"
           @click="recentExpanded = !recentExpanded"
         >
-          {{ recentExpanded ? '收起最近 7 天' : '展开最近 7 天' }}
+          {{ recentExpanded ? '收起最近 7 天 ↑' : '展开最近 7 天 ↓' }}
         </button>
       </app-card>
     </view>
@@ -1233,7 +1248,7 @@ function formatTime(value: string) {
   min-height: 106rpx;
   margin-left: 24rpx;
   padding: 18rpx 24rpx 18rpx 0;
-  border-bottom: 1rpx solid var(--app-separator);
+  border-bottom: 1rpx solid rgba(20, 40, 30, 0.06);
   box-sizing: border-box;
 }
 
@@ -1323,7 +1338,7 @@ function formatTime(value: string) {
 
 .recent-row {
   justify-content: flex-start;
-  min-height: 92rpx;
+  min-height: 94rpx;
 }
 
 .timeline-marker {
@@ -1337,9 +1352,9 @@ function formatTime(value: string) {
   position: absolute;
   top: 0rpx;
   bottom: -37rpx;
-  left: 24rpx;
+  left: 23rpx;
   width: 2rpx;
-  background: var(--app-separator);
+  background: #e6f0ea;
   content: '';
 }
 
@@ -1349,20 +1364,23 @@ function formatTime(value: string) {
 
 .timeline-dot {
   position: absolute;
-  top: 34rpx;
-  left: 12rpx;
-  width: 18rpx;
-  height: 18rpx;
-  border: 5rpx solid var(--app-orange-soft);
+  top: 35rpx;
+  left: 13rpx;
+  width: 22rpx;
+  height: 22rpx;
+  border: 0;
   border-radius: 50%;
   background: var(--app-orange);
-  box-sizing: content-box;
+  box-sizing: border-box;
 }
 
 .timeline-dot.empty {
-  border-color: var(--app-surface-tertiary);
-  background: var(--app-label-tertiary);
-  opacity: 0.52;
+  top: 37rpx;
+  left: 15rpx;
+  width: 18rpx;
+  height: 18rpx;
+  background: #d7e0db;
+  opacity: 1;
 }
 
 .recent-copy {
@@ -1373,13 +1391,18 @@ function formatTime(value: string) {
 .recent-event {
   display: block;
   margin-top: 5rpx;
-  font-size: 22rpx;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+  line-height: 1.35;
 }
 
 .recent-time {
   flex: 0 0 auto;
   margin: 0;
-  max-width: 240rpx;
+  max-width: 168rpx;
+  color: var(--app-label-secondary);
+  font-size: 24rpx;
+  font-weight: 680;
   text-align: right;
   white-space: normal;
   line-height: 1.25;
@@ -1387,15 +1410,14 @@ function formatTime(value: string) {
 
 .recent-backfill-button {
   flex: 0 0 auto;
-  min-width: 82rpx;
-  height: 52rpx;
-  padding: 0 18rpx;
+  height: 48rpx;
+  padding: 0 22rpx;
   border-radius: 999rpx;
-  color: var(--app-orange);
-  background: var(--app-orange-soft);
-  font-size: 22rpx;
-  font-weight: 760;
-  line-height: 52rpx;
+  color: #ff9800;
+  background: #fff3e0;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 48rpx;
   transition:
     opacity var(--app-motion-fast) ease-out,
     transform var(--app-motion-fast) ease-out;
@@ -1417,14 +1439,14 @@ function formatTime(value: string) {
 }
 
 .recent-toggle {
-  height: 74rpx;
-  margin: 8rpx 24rpx 20rpx;
-  border-radius: 18rpx;
+  height: 56rpx;
+  margin: 8rpx 24rpx 18rpx;
+  border-radius: 14rpx;
   color: var(--app-green);
-  background: var(--app-green-soft);
-  font-size: 24rpx;
+  background: rgba(34, 199, 111, 0.06);
+  font-size: 26rpx;
   font-weight: 680;
-  line-height: 74rpx;
+  line-height: 56rpx;
   transition:
     transform var(--app-motion-fast) var(--app-ease-out),
     opacity var(--app-motion-fast) ease-out;
