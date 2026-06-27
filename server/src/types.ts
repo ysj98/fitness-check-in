@@ -18,6 +18,8 @@ export interface AppCheckIn {
   userId: number
   checkedAt: Date
   createdAt: Date
+  isBackfill?: boolean
+  backfillReason?: string | null
 }
 
 export interface AppWeightRecord {

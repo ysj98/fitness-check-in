@@ -218,6 +218,13 @@ const recentQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 })
 
+const backfillReasonSchema = z.enum(['忘记打卡', '已运动未记录', '其他'])
+
+const backfillCheckInSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  reason: backfillReasonSchema.default('忘记打卡'),
+})
+
 const weightValueSchema = z.coerce.number().min(20).max(300)
 const heightValueSchema = z.coerce.number().min(100).max(250)
 
@@ -281,6 +288,39 @@ function calculateRawBmi(weightKg: number, heightCm: number | null) {
 function calculateBmi(weightKg: number, heightCm: number | null) {
   const bmi = calculateRawBmi(weightKg, heightCm)
   return bmi === null ? null : round(bmi, 1)
+}
+
+function getChinaDayRangeByDateKey(dateKey: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey)
+  if (!match) {
+    return null
+  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const start = new Date(Date.UTC(year, month - 1, day) - 8 * 60 * 60 * 1000)
+
+  if (formatChinaDate(start) !== dateKey) {
+    return null
+  }
+
+  return {
+    start,
+    end: addChinaDays(start, 1),
+  }
+}
+
+function getChinaMonthKeyFromDateKey(dateKey: string) {
+  return dateKey.slice(0, 7)
+}
+
+function serializeCheckInRecord(record: AppCheckIn) {
+  return {
+    id: record.id,
+    checkedAt: record.checkedAt.toISOString(),
+    isBackfill: Boolean(record.isBackfill),
+    backfillReason: record.backfillReason || '',
+  }
 }
 
 function getBmiCategory(bmi: number | null) {
@@ -900,10 +940,7 @@ export async function createApp(options: CreateAppOptions) {
 
     return ok({
       count,
-      records: records.map((record) => ({
-        id: record.id,
-        checkedAt: record.checkedAt.toISOString(),
-      })),
+      records: records.map((record) => serializeCheckInRecord(record)),
     })
   })
 
@@ -915,13 +952,61 @@ export async function createApp(options: CreateAppOptions) {
       },
     })
 
-    return ok(
-      {
-        id: record.id,
-        checkedAt: record.checkedAt.toISOString(),
+    return ok(serializeCheckInRecord(record), '打卡成功')
+  })
+
+  app.post('/api/checkins/backfill', async (request, reply) => {
+    const body = backfillCheckInSchema.parse(request.body)
+    const targetRange = getChinaDayRangeByDateKey(body.date)
+
+    if (!targetRange) {
+      return reply.code(400).send(fail('补签日期格式不正确', 400))
+    }
+
+    const todayRange = getChinaDayRange()
+    if (targetRange.start >= todayRange.start) {
+      return reply
+        .code(400)
+        .send(fail(body.date === formatChinaDate(todayRange.start) ? '今天请使用正常打卡' : '不能补签未来日期', 400))
+    }
+
+    const earliestAllowed = addChinaDays(todayRange.start, -30)
+    if (targetRange.start < earliestAllowed) {
+      return reply.code(400).send(fail('只能补签最近 30 天内的未打卡日期', 400))
+    }
+
+    const existing = await app.db.checkIn.findFirst({
+      where: {
+        userId: request.user.userId,
+        checkedAt: { gte: targetRange.start, lt: targetRange.end },
       },
-      '打卡成功',
-    )
+    })
+    if (existing) {
+      return reply.code(409).send(fail('该日期已有打卡记录，不能补签', 409))
+    }
+
+    const monthRange = getChinaMonthRange(getChinaMonthKeyFromDateKey(body.date))
+    const backfillUsed = await app.db.checkIn.count({
+      where: {
+        userId: request.user.userId,
+        isBackfill: true,
+        checkedAt: { gte: monthRange.start, lt: monthRange.end },
+      },
+    })
+    if (backfillUsed >= 3) {
+      return reply.code(400).send(fail('本月补签次数已用完', 400))
+    }
+
+    const record = await app.db.checkIn.create({
+      data: {
+        userId: request.user.userId,
+        checkedAt: new Date(targetRange.start.getTime() + 12 * 60 * 60 * 1000),
+        isBackfill: true,
+        backfillReason: body.reason,
+      },
+    })
+
+    return ok(serializeCheckInRecord(record), '补签成功')
   })
 
   app.get('/api/checkins/recent', async (request) => {
@@ -932,12 +1017,7 @@ export async function createApp(options: CreateAppOptions) {
       take: query.limit,
     })
 
-    return ok(
-      records.map((record) => ({
-        id: record.id,
-        checkedAt: record.checkedAt.toISOString(),
-      })),
-    )
+    return ok(records.map((record) => serializeCheckInRecord(record)))
   })
 
   app.get('/api/checkins/month', async (request) => {
@@ -956,8 +1036,17 @@ export async function createApp(options: CreateAppOptions) {
       result[key] = (result[key] || 0) + 1
       return result
     }, {})
+    const backfillDays = records.reduce<Record<string, number>>((result, record) => {
+      if (!record.isBackfill) {
+        return result
+      }
+      const key = formatChinaDate(record.checkedAt)
+      result[key] = (result[key] || 0) + 1
+      return result
+    }, {})
+    const backfillUsed = records.filter((record) => record.isBackfill).length
 
-    return ok({ month: query.month, days })
+    return ok({ month: query.month, days, backfillDays, backfillUsed, backfillLimit: 3 })
   })
 
   app.get('/api/checkins/stats', async (request) => {

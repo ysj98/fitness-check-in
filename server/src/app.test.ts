@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
-import { getChinaDayRange } from './date.js'
+import { addChinaDays, formatChinaDate, getChinaDayRange } from './date.js'
 
 function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; weightRecords: AppWeightRecord[] } {
   const users: AppUser[] = []
@@ -62,6 +62,8 @@ function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; w
           userId: args.data.userId,
           checkedAt: args.data.checkedAt,
           createdAt: new Date(),
+          isBackfill: Boolean(args.data.isBackfill),
+          backfillReason: args.data.backfillReason || null,
         }
         checkIns.push(record)
         return record
@@ -144,6 +146,9 @@ function matchWhere(record: AppCheckIn, where: any) {
   if (where.id !== undefined && record.id !== where.id) {
     return false
   }
+  if (where.isBackfill !== undefined && Boolean(record.isBackfill) !== where.isBackfill) {
+    return false
+  }
   if (where.checkedAt?.gte && record.checkedAt < where.checkedAt.gte) {
     return false
   }
@@ -186,7 +191,13 @@ function checkInAtChinaDay(userId: number, dayOffset: number, id: number): AppCh
     userId,
     checkedAt,
     createdAt: checkedAt,
+    isBackfill: false,
+    backfillReason: null,
   }
+}
+
+function chinaDateKeyForOffset(dayOffset: number) {
+  return formatChinaDate(addChinaDays(getChinaDayRange().start, -dayOffset))
 }
 
 function multipartAvatarPayload() {
@@ -300,6 +311,127 @@ describe('fitness check-in api', () => {
     })
 
     expect(response.json().data.days['2026-06-01']).toBe(2)
+  })
+
+  it('creates a backfill check-in for a past missing day and returns monthly backfill stats', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    const authorization = { authorization: `Bearer ${session.token}` }
+    const date = chinaDateKeyForOffset(1)
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date, reason: '已运动未记录' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().data).toMatchObject({
+      isBackfill: true,
+      backfillReason: '已运动未记录',
+    })
+
+    const monthResponse = await app.inject({
+      method: 'GET',
+      url: `/api/checkins/month?month=${date.slice(0, 7)}`,
+      headers: authorization,
+    })
+    expect(monthResponse.json().data.days[date]).toBe(1)
+    expect(monthResponse.json().data.backfillDays[date]).toBe(1)
+    expect(monthResponse.json().data.backfillUsed).toBe(1)
+    expect(monthResponse.json().data.backfillLimit).toBe(3)
+  })
+
+  it('rejects backfill for today, future dates, old dates, existing check-ins, and monthly limit', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    const authorization = { authorization: `Bearer ${session.token}` }
+    const today = chinaDateKeyForOffset(0)
+    const yesterday = chinaDateKeyForOffset(1)
+    const future = formatChinaDate(addChinaDays(getChinaDayRange().start, 1))
+    const tooOld = chinaDateKeyForOffset(31)
+
+    db.checkIns.push(checkInAtChinaDay(session.user.userId, 1, 1))
+    db.checkIns.push(
+      { ...checkInAtChinaDay(session.user.userId, 2, 2), isBackfill: true, backfillReason: '忘记打卡' },
+      { ...checkInAtChinaDay(session.user.userId, 3, 3), isBackfill: true, backfillReason: '忘记打卡' },
+      { ...checkInAtChinaDay(session.user.userId, 4, 4), isBackfill: true, backfillReason: '其他' },
+    )
+
+    const todayResponse = await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date: today, reason: '忘记打卡' },
+    })
+    const futureResponse = await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date: future, reason: '忘记打卡' },
+    })
+    const oldResponse = await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date: tooOld, reason: '忘记打卡' },
+    })
+    const existingResponse = await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date: yesterday, reason: '忘记打卡' },
+    })
+    const limitResponse = await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date: chinaDateKeyForOffset(5), reason: '忘记打卡' },
+    })
+
+    expect(todayResponse.statusCode).toBe(400)
+    expect(todayResponse.json().message).toBe('今天请使用正常打卡')
+    expect(futureResponse.statusCode).toBe(400)
+    expect(futureResponse.json().message).toBe('不能补签未来日期')
+    expect(oldResponse.statusCode).toBe(400)
+    expect(existingResponse.statusCode).toBe(409)
+    expect(limitResponse.statusCode).toBe(400)
+    expect(limitResponse.json().message).toBe('本月补签次数已用完')
+  })
+
+  it('includes backfilled days in current streak', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    const authorization = { authorization: `Bearer ${session.token}` }
+    db.checkIns.push(checkInAtChinaDay(session.user.userId, 0, 1), checkInAtChinaDay(session.user.userId, 2, 2))
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/checkins/backfill',
+      headers: authorization,
+      payload: { date: chinaDateKeyForOffset(1), reason: '忘记打卡' },
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/checkins/stats',
+      headers: authorization,
+    })
+
+    expect(response.json().data.currentStreak).toBe(3)
   })
 
   it('does not delete another user check-in', async () => {

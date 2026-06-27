@@ -1,6 +1,7 @@
 <script lang="ts" setup>
-import type { CheckInRecord, CheckInStatsRes, MonthCheckInRes } from '@/api/checkins'
+import type { BackfillReason, CheckInRecord, CheckInStatsRes, MonthCheckInRes } from '@/api/checkins'
 import {
+  createBackfillCheckIn,
   createCheckIn,
   deleteCheckIn,
   getCheckInStats,
@@ -28,6 +29,10 @@ interface CalendarDay {
   day: number
   count: number
   isToday: boolean
+  isFuture: boolean
+  isBackfilled: boolean
+  canBackfill: boolean
+  disabledReason: string
 }
 
 interface RecentDaySummary {
@@ -35,6 +40,8 @@ interface RecentDaySummary {
   label: string
   count: number
   isToday: boolean
+  isBackfilled: boolean
+  canBackfill: boolean
 }
 
 interface RecordTouchStart {
@@ -62,12 +69,24 @@ const selectedDateKey = ref(formatDateKey(new Date()))
 const recentExpanded = ref(false)
 const activeRecordActionId = ref<number | null>(null)
 const recordTouchStart = ref<RecordTouchStart | null>(null)
+const backfillSheetOpen = ref(false)
+const backfilling = ref(false)
+const selectedBackfillDateKey = ref('')
+const selectedBackfillReason = ref<BackfillReason>('忘记打卡')
+const selectedBackfillQuota = ref({ used: 0, limit: 3 })
 const todayCount = ref(0)
 const todayRecords = ref<CheckInRecord[]>([])
 const recentRecords = ref<CheckInRecord[]>([])
-const monthStats = ref<MonthCheckInRes>({ month: getMonthKey(), days: {} })
+const monthStats = ref<MonthCheckInRes>({
+  month: getMonthKey(),
+  days: {},
+  backfillDays: {},
+  backfillUsed: 0,
+  backfillLimit: 3,
+})
 const checkInStats = ref<CheckInStatsRes>({ ...emptyStats })
 const weekLabels = ['一', '二', '三', '四', '五', '六', '日']
+const backfillReasons: BackfillReason[] = ['忘记打卡', '已运动未记录', '其他']
 
 const todayLabel = computed(() => {
   const date = new Date()
@@ -85,15 +104,23 @@ const calendarDays = computed<CalendarDay[]>(() => {
   const [year, month] = monthStats.value.month.split('-').map(Number)
   const daysInMonth = new Date(year, month, 0).getDate()
   const todayKey = formatDateKey(new Date())
+  const todayStart = parseDateKey(todayKey)
 
   return Array.from({ length: daysInMonth }, (_, index) => {
     const day = index + 1
     const key = `${year}-${pad(month)}-${pad(day)}`
+    const date = parseDateKey(key)
+    const count = monthStats.value.days[key] || 0
+    const disabledReason = getBackfillDisabledReason(key, count)
     return {
       key,
       day,
-      count: monthStats.value.days[key] || 0,
+      count,
       isToday: key === todayKey,
+      isFuture: date > todayStart,
+      isBackfilled: (monthStats.value.backfillDays[key] || 0) > 0,
+      canBackfill: disabledReason === '',
+      disabledReason,
     }
   })
 })
@@ -124,17 +151,27 @@ const recentDaySummaries = computed<RecentDaySummary[]>(() => {
     result[key] = (result[key] || 0) + 1
     return result
   }, {})
+  const backfillMap = recentRecords.value.reduce<Record<string, number>>((result, record) => {
+    if (record.isBackfill) {
+      const key = formatDateKey(new Date(record.checkedAt))
+      result[key] = (result[key] || 0) + 1
+    }
+    return result
+  }, {})
   const today = new Date()
 
   return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(today)
     date.setDate(today.getDate() - index)
     const key = formatDateKey(date)
+    const count = countMap[key] || 0
     return {
       key,
       label: index === 0 ? '今天' : `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
-      count: countMap[key] || 0,
+      count,
       isToday: index === 0,
+      isBackfilled: (backfillMap[key] || 0) > 0,
+      canBackfill: getBackfillDisabledReason(key, count, monthStats.value, false) === '',
     }
   })
 })
@@ -142,6 +179,31 @@ const recentDaySummaries = computed<RecentDaySummary[]>(() => {
 const visibleRecentDaySummaries = computed(() => {
   return recentExpanded.value ? recentDaySummaries.value : recentDaySummaries.value.slice(0, 3)
 })
+
+const selectedCalendarDay = computed(() => calendarDays.value.find((day) => day.key === selectedDateKey.value))
+const selectedCalendarHint = computed(() => {
+  const day = selectedCalendarDay.value
+  if (!day) {
+    return ''
+  }
+  if (day.count > 0) {
+    return `${formatDateText(day.key)} 已打卡 ${day.count} 次${day.isBackfilled ? '，含补签记录' : ''}`
+  }
+  if (day.isToday) {
+    return `${formatDateText(day.key)} 今天请使用正常打卡`
+  }
+  if (day.canBackfill) {
+    return `${formatDateText(day.key)} 可补签`
+  }
+  return `${formatDateText(day.key)} ${day.disabledReason}`
+})
+const backfillQuotaText = computed(() => `${monthStats.value.backfillUsed}/${monthStats.value.backfillLimit}`)
+const selectedBackfillDateText = computed(() =>
+  selectedBackfillDateKey.value ? formatDateText(selectedBackfillDateKey.value) : '',
+)
+const selectedBackfillQuotaText = computed(
+  () => `${selectedBackfillQuota.value.used}/${selectedBackfillQuota.value.limit}`,
+)
 
 onLoad(() => {
   initPage()
@@ -269,8 +331,76 @@ async function handleDelete(record: CheckInRecord) {
   })
 }
 
-function selectCalendarDay(day: CalendarDay) {
+async function selectCalendarDay(day: CalendarDay) {
   selectedDateKey.value = day.key
+
+  if (day.isToday || day.count > 0) {
+    return
+  }
+
+  if (!day.canBackfill) {
+    uni.showToast({ title: day.disabledReason, icon: 'none' })
+    return
+  }
+
+  await openBackfillSheet(day.key)
+}
+
+async function openBackfillSheet(dateKey: string) {
+  const targetMonth = dateKey.slice(0, 7)
+  let targetMonthStats = monthStats.value
+
+  if (targetMonth !== monthStats.value.month) {
+    targetMonthStats = await getMonthCheckIns(targetMonth)
+  }
+
+  const disabledReason = getBackfillDisabledReason(dateKey, targetMonthStats.days[dateKey] || 0, targetMonthStats)
+  if (disabledReason) {
+    uni.showToast({ title: disabledReason, icon: 'none' })
+    return
+  }
+
+  selectedBackfillDateKey.value = dateKey
+  selectedBackfillReason.value = '忘记打卡'
+  selectedBackfillQuota.value = {
+    used: targetMonthStats.backfillUsed,
+    limit: targetMonthStats.backfillLimit,
+  }
+  backfillSheetOpen.value = true
+}
+
+function closeBackfillSheet() {
+  if (backfilling.value) {
+    return
+  }
+  backfillSheetOpen.value = false
+}
+
+async function handleConfirmBackfill() {
+  if (!selectedBackfillDateKey.value || backfilling.value) {
+    return
+  }
+
+  backfilling.value = true
+  try {
+    const dateKey = selectedBackfillDateKey.value
+    await createBackfillCheckIn(dateKey, selectedBackfillReason.value)
+    const targetDate = parseDateKey(dateKey)
+    selectedMonth.value = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
+    backfillSheetOpen.value = false
+    await loadDashboard()
+    triggerSuccessHaptic()
+    uni.showToast({ title: '补签成功', icon: 'success' })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '补签失败，请重试'
+    uni.showToast({ title: message, icon: 'none' })
+  } finally {
+    backfilling.value = false
+  }
+}
+
+function selectBackfillReason(reason: BackfillReason) {
+  selectedBackfillReason.value = reason
 }
 
 function handleRecordTouchStart(recordId: number, event: TouchEvent) {
@@ -313,6 +443,41 @@ function formatDateKey(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+function parseDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function getBackfillDisabledReason(dateKey: string, count: number, stats = monthStats.value, includeQuota = true) {
+  const todayKey = formatDateKey(new Date())
+  const targetDate = parseDateKey(dateKey)
+  const todayDate = parseDateKey(todayKey)
+  const earliestDate = new Date(todayDate)
+  earliestDate.setDate(todayDate.getDate() - 30)
+
+  if (dateKey === todayKey) {
+    return '今天请使用正常打卡'
+  }
+  if (targetDate > todayDate) {
+    return '不能补签未来日期'
+  }
+  if (count > 0) {
+    return '该日期已有打卡记录'
+  }
+  if (targetDate < earliestDate) {
+    return '只能补签最近 30 天内的未打卡日期'
+  }
+  if (includeQuota && stats.backfillUsed >= stats.backfillLimit) {
+    return '本月补签次数已用完'
+  }
+  return ''
+}
+
+function formatDateText(dateKey: string) {
+  const [year, month, day] = dateKey.split('-')
+  return `${year}年${month}月${day}日`
+}
+
 function pad(value: number) {
   return value.toString().padStart(2, '0')
 }
@@ -351,7 +516,10 @@ function formatTime(value: string) {
       </app-card>
     </view>
 
-    <text class="ios-section-title">月度热力</text>
+    <view class="calendar-section-head">
+      <text class="ios-section-title calendar-section-title">月度热力</text>
+      <text class="backfill-quota numeric">本月补签 {{ backfillQuotaText }}</text>
+    </view>
     <view class="calendar-card-shell">
       <app-card accent="blue">
         <view class="calendar-card-content">
@@ -383,6 +551,9 @@ function formatTime(value: string) {
                 'level-2': day.count === 2,
                 'level-3': day.count >= 3,
                 today: day.isToday,
+                future: day.isFuture,
+                backfilled: day.isBackfilled,
+                'can-backfill': day.canBackfill,
                 selected: day.key === selectedDateKey,
               }"
               @click="selectCalendarDay(day)"
@@ -391,6 +562,7 @@ function formatTime(value: string) {
               <view v-if="day.count > 0" class="day-count numeric">
                 {{ day.count }}
               </view>
+              <view v-if="day.isBackfilled" class="backfill-corner">补</view>
             </view>
           </view>
           <view class="heat-legend">
@@ -399,6 +571,9 @@ function formatTime(value: string) {
             <view class="legend-dot level-2" />
             <view class="legend-dot level-3" />
             <text>多</text>
+          </view>
+          <view v-if="selectedCalendarHint" class="selected-day-hint">
+            <text>{{ selectedCalendarHint }}</text>
           </view>
         </view>
       </app-card>
@@ -454,10 +629,18 @@ function formatTime(value: string) {
           <view class="recent-copy">
             <text class="recent-date">{{ day.label }}</text>
             <text class="recent-event">
-              {{ day.count > 0 ? '运动打卡' : '未打卡' }}
+              {{ day.count > 0 ? (day.isBackfilled ? '补签打卡' : '运动打卡') : '未打卡' }}
             </text>
           </view>
-          <text class="recent-time numeric">
+          <button
+            v-if="day.canBackfill"
+            class="recent-backfill-button"
+            hover-class="recent-backfill-pressed"
+            @click.stop="openBackfillSheet(day.key)"
+          >
+            补签
+          </button>
+          <text v-else class="recent-time numeric">
             {{ day.count > 0 ? `${day.count} 次` : '未完成' }}
           </text>
         </view>
@@ -471,6 +654,43 @@ function formatTime(value: string) {
         </button>
       </app-card>
     </view>
+
+    <app-sheet
+      v-if="backfillSheetOpen"
+      title="补签打卡"
+      save-text="确认补签"
+      :saving="backfilling"
+      close-text="取消"
+      @close="closeBackfillSheet"
+      @save="handleConfirmBackfill"
+    >
+      <view class="backfill-sheet">
+        <view class="backfill-info-row">
+          <text class="backfill-info-label">补签日期</text>
+          <text class="backfill-info-value">{{ selectedBackfillDateText }}</text>
+        </view>
+        <text class="backfill-note">补签后，该日期将计入月度热力、连续打卡和成就统计。</text>
+        <view class="backfill-field">
+          <text class="backfill-field-title">补签原因</text>
+          <view class="reason-options">
+            <button
+              v-for="reason in backfillReasons"
+              :key="reason"
+              class="reason-option"
+              :class="{ active: selectedBackfillReason === reason }"
+              hover-class="reason-option-pressed"
+              @click="selectBackfillReason(reason)"
+            >
+              {{ reason }}
+            </button>
+          </view>
+        </view>
+        <view class="backfill-info-row">
+          <text class="backfill-info-label">本月补签次数</text>
+          <text class="backfill-info-value numeric">{{ selectedBackfillQuotaText }}</text>
+        </view>
+      </view>
+    </app-sheet>
   </view>
 </template>
 
@@ -508,6 +728,24 @@ function formatTime(value: string) {
 
 .energy-card-content.pulse {
   animation: success-pop 320ms var(--app-ease-spring) both;
+}
+
+.calendar-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-right: calc(var(--app-gutter) + 12rpx);
+}
+
+.calendar-section-title {
+  margin-right: 0;
+}
+
+.backfill-quota {
+  margin-bottom: 14rpx;
+  color: var(--app-orange);
+  font-size: 22rpx;
+  font-weight: 720;
 }
 
 .calendar-head,
@@ -674,6 +912,17 @@ function formatTime(value: string) {
   background: transparent;
 }
 
+.calendar-day.future {
+  color: var(--app-label-tertiary);
+  opacity: 0.52;
+}
+
+.calendar-day.can-backfill {
+  color: var(--app-orange);
+  background: rgba(255, 159, 28, 0.08);
+  box-shadow: inset 0 0 0 2rpx rgba(255, 159, 28, 0.2);
+}
+
 .calendar-day.level-1 {
   color: var(--app-green);
   background: var(--app-green-soft);
@@ -705,6 +954,12 @@ function formatTime(value: string) {
   box-shadow: inset 0 0 0 4rpx var(--app-green);
 }
 
+.calendar-day.backfilled {
+  color: var(--app-green);
+  background: var(--app-green-soft);
+  font-weight: 750;
+}
+
 .calendar-day.placeholder {
   visibility: hidden;
 }
@@ -725,6 +980,29 @@ function formatTime(value: string) {
   box-sizing: border-box;
 }
 
+.calendar-day.backfilled .day-count {
+  top: -1rpx;
+  right: -2rpx;
+  bottom: auto;
+}
+
+.backfill-corner {
+  position: absolute;
+  right: -3rpx;
+  bottom: -3rpx;
+  min-width: 30rpx;
+  height: 26rpx;
+  padding: 0 5rpx;
+  border-radius: 10rpx 4rpx 10rpx 4rpx;
+  color: #fff;
+  background: var(--app-orange);
+  font-size: 17rpx;
+  font-weight: 800;
+  line-height: 26rpx;
+  text-align: center;
+  box-sizing: border-box;
+}
+
 .heat-legend {
   display: flex;
   align-items: center;
@@ -733,6 +1011,17 @@ function formatTime(value: string) {
   margin-top: 22rpx;
   color: var(--app-label-tertiary);
   font-size: 19rpx;
+}
+
+.selected-day-hint {
+  margin-top: 18rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 18rpx;
+  color: var(--app-label-secondary);
+  background: var(--app-fill);
+  font-size: 22rpx;
+  line-height: 1.35;
+  box-sizing: border-box;
 }
 
 .legend-dot {
@@ -915,6 +1204,27 @@ function formatTime(value: string) {
   margin: 0;
 }
 
+.recent-backfill-button {
+  flex: 0 0 auto;
+  min-width: 82rpx;
+  height: 52rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  color: var(--app-orange);
+  background: var(--app-orange-soft);
+  font-size: 22rpx;
+  font-weight: 760;
+  line-height: 52rpx;
+  transition:
+    opacity var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) ease-out;
+}
+
+.recent-backfill-pressed {
+  opacity: 0.78;
+  transform: scale(0.96);
+}
+
 .recent-row.muted .recent-time {
   color: var(--app-label-tertiary);
   font-size: 21rpx;
@@ -953,6 +1263,88 @@ function formatTime(value: string) {
   color: var(--app-label-secondary);
   font-size: 25rpx;
   text-align: center;
+}
+
+.backfill-sheet {
+  padding-top: 18rpx;
+}
+
+.backfill-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88rpx;
+  gap: 20rpx;
+  padding: 0 20rpx;
+  border-radius: 22rpx;
+  background: var(--app-surface);
+  box-sizing: border-box;
+}
+
+.backfill-info-label,
+.backfill-field-title {
+  color: var(--app-label-secondary);
+  font-size: 24rpx;
+  font-weight: 680;
+}
+
+.backfill-info-value {
+  color: var(--app-label-primary);
+  font-size: 27rpx;
+  font-weight: 780;
+}
+
+.backfill-note {
+  display: block;
+  margin: 20rpx 4rpx;
+  color: var(--app-label-secondary);
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.backfill-field {
+  margin-bottom: 18rpx;
+  padding: 20rpx;
+  border-radius: 22rpx;
+  background: var(--app-surface);
+  box-sizing: border-box;
+}
+
+.backfill-field-title {
+  display: block;
+  margin-bottom: 16rpx;
+}
+
+.reason-options {
+  display: flex;
+  gap: 12rpx;
+}
+
+.reason-option {
+  flex: 1;
+  min-width: 0;
+  height: 66rpx;
+  padding: 0 10rpx;
+  border-radius: 18rpx;
+  color: var(--app-label-secondary);
+  background: var(--app-fill);
+  font-size: 22rpx;
+  font-weight: 680;
+  line-height: 66rpx;
+  transition:
+    opacity var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) ease-out,
+    background-color var(--app-motion-fast) ease-out;
+}
+
+.reason-option.active {
+  color: #fff;
+  background: var(--app-orange);
+}
+
+.reason-option-pressed {
+  opacity: 0.8;
+  transform: scale(0.97);
 }
 
 @keyframes success-pop {

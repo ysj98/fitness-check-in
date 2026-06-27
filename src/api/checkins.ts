@@ -3,6 +3,8 @@ import { http } from '@/http/http'
 export interface CheckInRecord {
   id: number
   checkedAt: string
+  isBackfill: boolean
+  backfillReason: string
 }
 
 export interface TodayCheckInRes {
@@ -13,7 +15,12 @@ export interface TodayCheckInRes {
 export interface MonthCheckInRes {
   month: string
   days: Record<string, number>
+  backfillDays: Record<string, number>
+  backfillUsed: number
+  backfillLimit: number
 }
+
+export type BackfillReason = '忘记打卡' | '已运动未记录' | '其他'
 
 export interface CheckInBadge {
   key: string
@@ -36,6 +43,10 @@ export function getTodayCheckIns() {
 
 export function createCheckIn() {
   return http.post<CheckInRecord>('/api/checkins', {})
+}
+
+export function createBackfillCheckIn(date: string, reason: BackfillReason) {
+  return http.post<CheckInRecord>('/api/checkins/backfill', { date, reason })
 }
 
 export function getRecentCheckIns(limit = 20) {
