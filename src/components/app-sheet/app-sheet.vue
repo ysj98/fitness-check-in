@@ -6,12 +6,14 @@ withDefaults(
     saveText?: string
     closeText?: string
     showSave?: boolean
+    compact?: boolean
   }>(),
   {
     saving: false,
     saveText: '保存',
     closeText: '取消',
     showSave: true,
+    compact: false,
   },
 )
 
@@ -22,8 +24,8 @@ defineEmits<{
 </script>
 
 <template>
-  <view class="modal-mask" @click.self="$emit('close')">
-    <view class="app-sheet" @click.stop>
+  <view class="modal-mask" :class="{ compact }" @click.self="$emit('close')">
+    <view class="app-sheet" :class="{ compact }" @click.stop>
       <view class="sheet-grabber" />
       <view class="sheet-head">
         <button class="toolbar-button" @click.stop="$emit('close')">{{ closeText }}</button>
@@ -51,6 +53,12 @@ defineEmits<{
   animation: mask-enter var(--app-motion-normal) ease-out both;
 }
 
+.modal-mask.compact {
+  background: rgba(12, 24, 18, 0.32);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 .app-sheet {
   width: 100%;
   max-height: 88vh;
@@ -61,6 +69,12 @@ defineEmits<{
   box-shadow: 0 -24rpx 60rpx rgba(0, 0, 0, 0.18);
   box-sizing: border-box;
   animation: sheet-enter var(--app-motion-normal) var(--app-ease-out) both;
+}
+
+.app-sheet.compact {
+  max-height: 72vh;
+  padding: 14rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #F7FBF8;
 }
 
 .sheet-grabber {

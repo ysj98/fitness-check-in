@@ -229,6 +229,18 @@ const selectedBackfillDateText = computed(() =>
 const selectedBackfillQuotaText = computed(
   () => `${selectedBackfillQuota.value.used}/${selectedBackfillQuota.value.limit}`,
 )
+const selectedCheckInDurationText = computed(() =>
+  formatSelectedDuration(selectedDurationOption.value, customDuration.value),
+)
+const selectedBackfillDurationText = computed(() =>
+  formatSelectedDuration(selectedBackfillDurationOption.value, customBackfillDuration.value),
+)
+const checkInSheetSummary = computed(() =>
+  `已选：${selectedSportType.value} · ${selectedCheckInDurationText.value}`,
+)
+const backfillSheetSummary = computed(() =>
+  `已选：${selectedBackfillSportType.value} · ${selectedBackfillDurationText.value}`,
+)
 
 onLoad(() => {
   initPage()
@@ -389,6 +401,15 @@ function resolveDurationMinutes(option: number | 'custom', customValue: string) 
     return null
   }
   return minutes
+}
+
+function formatSelectedDuration(option: number | 'custom', customValue: string) {
+  if (typeof option === 'number') {
+    return `${option} 分钟`
+  }
+
+  const value = customValue.trim()
+  return value ? `${value} 分钟` : '自定义时长'
 }
 
 async function handleConfirmCheckIn() {
@@ -822,20 +843,24 @@ function formatTime(value: string) {
     <app-sheet
       v-if="checkInSheetOpen"
       title="运动打卡"
-      save-text="确认打卡"
       :saving="checking"
       close-text="取消"
+      :show-save="false"
+      compact
       @close="closeCheckInSheet"
-      @save="handleConfirmCheckIn"
     >
-      <view class="checkin-sheet">
-        <view class="checkin-field">
+      <view class="checkin-sheet refined-action-sheet">
+        <view class="sheet-selection-summary">
+          <text>{{ checkInSheetSummary }}</text>
+        </view>
+
+        <view class="checkin-field sheet-choice-card">
           <text class="checkin-field-title">运动类型</text>
           <view class="sheet-option-grid sport-options">
             <button
               v-for="type in sportTypes"
               :key="type"
-              class="sheet-option"
+              class="sheet-option sport-option"
               :class="{ active: selectedSportType === type }"
               hover-class="sheet-option-pressed"
               @click.stop="selectedSportType = type"
@@ -845,13 +870,13 @@ function formatTime(value: string) {
           </view>
         </view>
 
-        <view class="checkin-field">
+        <view class="checkin-field sheet-choice-card">
           <text class="checkin-field-title">运动时长</text>
           <view class="sheet-option-grid duration-options">
             <button
               v-for="minutes in durationOptions"
               :key="minutes"
-              class="sheet-option"
+              class="sheet-option duration-option"
               :class="{ active: selectedDurationOption === minutes }"
               hover-class="sheet-option-pressed"
               @click.stop="selectDurationOption(minutes)"
@@ -859,7 +884,7 @@ function formatTime(value: string) {
               {{ minutes }} 分钟
             </button>
             <button
-              class="sheet-option"
+              class="sheet-option duration-option"
               :class="{ active: selectedDurationOption === 'custom' }"
               hover-class="sheet-option-pressed"
               @click.stop="selectDurationOption('custom')"
@@ -878,31 +903,46 @@ function formatTime(value: string) {
             <text class="custom-duration-unit">分钟</text>
           </view>
         </view>
+
+        <view class="sheet-action-bar">
+          <button class="sheet-action secondary" :disabled="checking" hover-class="sheet-action-pressed" @click.stop="closeCheckInSheet">
+            取消
+          </button>
+          <button class="sheet-action primary" :disabled="checking" hover-class="sheet-action-pressed" @click.stop="handleConfirmCheckIn">
+            {{ checking ? '打卡中' : '确认打卡' }}
+          </button>
+        </view>
       </view>
     </app-sheet>
 
     <app-sheet
       v-if="backfillSheetOpen"
       title="补签打卡"
-      save-text="确认补签"
       :saving="backfilling"
       close-text="取消"
+      :show-save="false"
+      compact
       @close="closeBackfillSheet"
-      @save="handleConfirmBackfill"
     >
-      <view class="backfill-sheet">
-        <view class="backfill-info-row">
-          <text class="backfill-info-label">补签日期</text>
-          <text class="backfill-info-value">{{ selectedBackfillDateText }}</text>
+      <view class="backfill-sheet refined-action-sheet">
+        <view class="sheet-selection-summary">
+          <text>{{ backfillSheetSummary }}</text>
         </view>
-        <text class="backfill-note">补签后，该日期将计入月度热力、连续打卡和成就统计。</text>
-        <view class="backfill-field">
+
+        <view class="backfill-meta-card">
+          <view class="backfill-info-row">
+            <text class="backfill-info-label">补签日期</text>
+            <text class="backfill-info-value">{{ selectedBackfillDateText }}</text>
+          </view>
+          <text class="backfill-note">补签后，该日期将计入月度热力、连续打卡和成就统计。</text>
+        </view>
+        <view class="backfill-field sheet-choice-card">
           <text class="backfill-field-title">运动类型</text>
           <view class="sheet-option-grid sport-options">
             <button
               v-for="type in sportTypes"
               :key="type"
-              class="sheet-option"
+              class="sheet-option sport-option"
               :class="{ active: selectedBackfillSportType === type }"
               hover-class="sheet-option-pressed"
               @click.stop="selectedBackfillSportType = type"
@@ -911,13 +951,13 @@ function formatTime(value: string) {
             </button>
           </view>
         </view>
-        <view class="backfill-field">
+        <view class="backfill-field sheet-choice-card">
           <text class="backfill-field-title">运动时长</text>
           <view class="sheet-option-grid duration-options">
             <button
               v-for="minutes in durationOptions"
               :key="minutes"
-              class="sheet-option"
+              class="sheet-option duration-option"
               :class="{ active: selectedBackfillDurationOption === minutes }"
               hover-class="sheet-option-pressed"
               @click.stop="selectBackfillDurationOption(minutes)"
@@ -925,7 +965,7 @@ function formatTime(value: string) {
               {{ minutes }} 分钟
             </button>
             <button
-              class="sheet-option"
+              class="sheet-option duration-option"
               :class="{ active: selectedBackfillDurationOption === 'custom' }"
               hover-class="sheet-option-pressed"
               @click.stop="selectBackfillDurationOption('custom')"
@@ -944,7 +984,7 @@ function formatTime(value: string) {
             <text class="custom-duration-unit">分钟</text>
           </view>
         </view>
-        <view class="backfill-field">
+        <view class="backfill-field sheet-choice-card">
           <text class="backfill-field-title">补签原因</text>
           <view class="reason-options">
             <button
@@ -959,9 +999,18 @@ function formatTime(value: string) {
             </button>
           </view>
         </view>
-        <view class="backfill-info-row">
+        <view class="backfill-info-row backfill-quota-row">
           <text class="backfill-info-label">本月补签次数</text>
           <text class="backfill-info-value numeric">{{ selectedBackfillQuotaText }}</text>
+        </view>
+
+        <view class="sheet-action-bar">
+          <button class="sheet-action secondary" :disabled="backfilling" hover-class="sheet-action-pressed" @click.stop="closeBackfillSheet">
+            取消
+          </button>
+          <button class="sheet-action primary" :disabled="backfilling" hover-class="sheet-action-pressed" @click.stop="handleConfirmBackfill">
+            {{ backfilling ? '补签中' : '确认补签' }}
+          </button>
         </view>
       </view>
     </app-sheet>
@@ -1544,29 +1593,62 @@ function formatTime(value: string) {
   text-align: center;
 }
 
-.checkin-sheet {
-  padding-top: 18rpx;
+.checkin-sheet,
+.backfill-sheet {
+  padding-top: 10rpx;
 }
 
-.checkin-field {
-  margin-bottom: 18rpx;
-  padding: 20rpx;
-  border-radius: 22rpx;
-  background: var(--app-surface);
+.refined-action-sheet {
+  max-height: calc(72vh - 112rpx - env(safe-area-inset-bottom));
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
-.checkin-field-title {
-  display: block;
+.sheet-selection-summary {
+  display: flex;
+  align-items: center;
+  min-height: 72rpx;
+  margin: 6rpx 0 18rpx;
+  padding: 0 24rpx;
+  border: 1rpx solid rgba(34, 199, 111, 0.18);
+  border-radius: 24rpx;
+  color: var(--app-green);
+  background: rgba(34, 199, 111, 0.08);
+  font-size: 25rpx;
+  font-weight: 760;
+  box-sizing: border-box;
+}
+
+.checkin-field,
+.backfill-field,
+.sheet-choice-card,
+.backfill-meta-card,
+.backfill-quota-row {
+  border-radius: 26rpx;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.checkin-field,
+.backfill-field,
+.sheet-choice-card {
   margin-bottom: 16rpx;
-  color: var(--app-label-secondary);
-  font-size: 24rpx;
-  font-weight: 680;
+  padding: 22rpx;
+  box-shadow: 0 12rpx 32rpx rgba(42, 111, 76, 0.06);
+}
+
+.checkin-field-title,
+.backfill-field-title {
+  display: block;
+  margin-bottom: 18rpx;
+  color: var(--app-label-primary);
+  font-size: 26rpx;
+  font-weight: 780;
 }
 
 .sheet-option-grid {
   display: grid;
-  gap: 12rpx;
+  gap: 14rpx;
 }
 
 .sport-options {
@@ -1577,81 +1659,94 @@ function formatTime(value: string) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.sheet-option {
+.sheet-option,
+.reason-option {
   min-width: 0;
-  height: 68rpx;
-  padding: 0 10rpx;
-  border-radius: 18rpx;
+  height: 72rpx;
+  padding: 0 12rpx;
+  border: 2rpx solid transparent;
+  border-radius: 999rpx;
   color: var(--app-label-secondary);
-  background: var(--app-fill);
+  background: #EEF6F1;
   font-size: 23rpx;
-  font-weight: 700;
+  font-weight: 720;
   line-height: 68rpx;
+  box-sizing: border-box;
   transition:
     transform var(--app-motion-fast) ease-out,
     opacity var(--app-motion-fast) ease-out,
+    border-color var(--app-motion-fast) ease-out,
     background var(--app-motion-fast) ease-out;
 }
 
-.sheet-option.active {
-  color: var(--app-green);
-  background: var(--app-green-soft);
-  box-shadow: inset 0 0 0 2rpx rgba(34, 199, 111, 0.28);
+.sport-option {
+  height: 72rpx;
 }
 
-.sheet-option-pressed {
-  opacity: 0.78;
+.duration-option {
+  height: 72rpx;
+}
+
+.sheet-option.active,
+.reason-option.active {
+  border-color: rgba(34, 199, 111, 0.72);
+  color: var(--app-green);
+  background: #DDF6E8;
+}
+
+.sheet-option-pressed,
+.reason-option-pressed,
+.sheet-action-pressed {
+  opacity: 0.82;
   transform: scale(0.97);
 }
 
 .custom-duration-row {
   display: flex;
   align-items: center;
-  min-height: 78rpx;
-  margin-top: 14rpx;
-  padding: 0 18rpx;
-  border-radius: 18rpx;
-  background: var(--app-fill);
+  min-height: 82rpx;
+  margin-top: 16rpx;
+  padding: 0 22rpx;
+  border: 2rpx solid rgba(34, 199, 111, 0.18);
+  border-radius: 22rpx;
+  background: #F4FAF6;
   box-sizing: border-box;
 }
 
 .custom-duration-input {
   flex: 1;
   min-width: 0;
-  height: 78rpx;
+  height: 82rpx;
   color: var(--app-label-primary);
-  font-size: 26rpx;
-  font-weight: 760;
+  font-size: 28rpx;
+  font-weight: 780;
 }
 
 .custom-duration-unit {
   flex: 0 0 auto;
   color: var(--app-label-secondary);
-  font-size: 23rpx;
-  font-weight: 680;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
-.backfill-sheet {
-  padding-top: 18rpx;
+.backfill-meta-card {
+  margin-bottom: 16rpx;
+  padding: 18rpx 22rpx;
+  box-shadow: 0 12rpx 32rpx rgba(42, 111, 76, 0.06);
 }
 
 .backfill-info-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 88rpx;
+  min-height: 54rpx;
   gap: 20rpx;
-  padding: 0 20rpx;
-  border-radius: 22rpx;
-  background: var(--app-surface);
-  box-sizing: border-box;
 }
 
-.backfill-info-label,
-.backfill-field-title {
+.backfill-info-label {
   color: var(--app-label-secondary);
   font-size: 24rpx;
-  font-weight: 680;
+  font-weight: 700;
 }
 
 .backfill-info-value {
@@ -1662,55 +1757,65 @@ function formatTime(value: string) {
 
 .backfill-note {
   display: block;
-  margin: 20rpx 4rpx;
+  margin-top: 8rpx;
   color: var(--app-label-secondary);
-  font-size: 24rpx;
+  font-size: 23rpx;
   line-height: 1.45;
 }
 
-.backfill-field {
-  margin-bottom: 18rpx;
-  padding: 20rpx;
-  border-radius: 22rpx;
-  background: var(--app-surface);
-  box-sizing: border-box;
-}
-
-.backfill-field-title {
-  display: block;
-  margin-bottom: 16rpx;
-}
-
 .reason-options {
-  display: flex;
-  gap: 12rpx;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
 }
 
 .reason-option {
-  flex: 1;
-  min-width: 0;
-  height: 66rpx;
-  padding: 0 10rpx;
-  border-radius: 18rpx;
-  color: var(--app-label-secondary);
-  background: var(--app-fill);
+  width: 100%;
   font-size: 22rpx;
-  font-weight: 680;
-  line-height: 66rpx;
+}
+
+.backfill-quota-row {
+  min-height: 72rpx;
+  margin-bottom: 16rpx;
+  padding: 0 22rpx;
+  box-shadow: 0 12rpx 32rpx rgba(42, 111, 76, 0.06);
+}
+
+.sheet-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1.45fr;
+  gap: 16rpx;
+  padding: 14rpx 0 2rpx;
+  background: linear-gradient(180deg, rgba(247, 251, 248, 0), #F7FBF8 24rpx);
+}
+
+.sheet-action {
+  height: 88rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 88rpx;
   transition:
     opacity var(--app-motion-fast) ease-out,
-    transform var(--app-motion-fast) ease-out,
-    background-color var(--app-motion-fast) ease-out;
+    transform var(--app-motion-fast) ease-out;
 }
 
-.reason-option.active {
+.sheet-action.secondary {
+  color: var(--app-label-secondary);
+  background: #EAF2ED;
+}
+
+.sheet-action.primary {
   color: #fff;
-  background: var(--app-orange);
+  background: linear-gradient(135deg, var(--app-green), var(--app-green-deep));
+  box-shadow: 0 16rpx 32rpx rgba(32, 196, 107, 0.22);
 }
 
-.reason-option-pressed {
-  opacity: 0.8;
-  transform: scale(0.97);
+.sheet-action[disabled] {
+  opacity: 0.58;
 }
 
 @keyframes success-pop {

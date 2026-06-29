@@ -543,7 +543,7 @@ function getChinaDateTimeParts(date: Date) {
       <view class="section-shell">
         <app-card accent="blue">
           <view class="section-content trend-section">
-            <view class="section-head">
+            <view class="section-head trend-head">
               <text class="section-title">趋势</text>
               <view class="metric-control">
                 <app-segmented-control
@@ -553,12 +553,13 @@ function getChinaDateTimeParts(date: Date) {
                 />
               </view>
             </view>
-            <app-segmented-control
-              class="range-switch"
-              :model-value="selectedDays"
-              :options="rangeOptions"
-              @change="selectDays"
-            />
+            <view class="range-control-shell">
+              <app-segmented-control
+                :model-value="selectedDays"
+                :options="rangeOptions"
+                @change="selectDays"
+              />
+            </view>
             <view v-if="loading && stats.trend.length === 0" class="chart-loading"> 加载中 </view>
             <view v-else-if="stats.trend.length < 3" class="chart-empty compact">
               {{ trendEmptyText }}
@@ -903,7 +904,14 @@ function getChinaDateTimeParts(date: Date) {
   gap: 20rpx;
 }
 
+.trend-head {
+  flex-wrap: wrap;
+  gap: 18rpx 24rpx;
+}
+
 .section-title {
+  flex: 1;
+  min-width: 0;
   font-size: 30rpx;
   font-weight: 780;
 }
@@ -914,11 +922,12 @@ function getChinaDateTimeParts(date: Date) {
 }
 
 .metric-control {
-  flex: 0 0 220rpx;
+  flex: 0 0 228rpx;
+  max-width: 100%;
 }
 
-.range-switch {
-  margin-top: 24rpx;
+.range-control-shell {
+  margin-top: 26rpx;
 }
 
 .chart-box {
