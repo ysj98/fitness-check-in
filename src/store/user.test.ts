@@ -16,7 +16,10 @@ function createUser(overrides: Partial<IUserInfoRes> = {}): IUserInfoRes {
     avatarUrl: '',
     gender: '',
     birthday: '',
-    dailyGoal: 1,
+    goalPeriod: 'week',
+    goalMode: 'count',
+    goalCount: 1,
+    goalDuration: 30,
     heightCm: null,
     targetWeightKg: null,
     weightUnit: 'kg',
@@ -34,10 +37,13 @@ describe('user store', () => {
 
   it('normalizes missing avatar and optional defaults', () => {
     const store = useUserStore()
-    store.setUserInfo(createUser({ dailyGoal: 0 }))
+    store.setUserInfo(createUser({ goalCount: 0, goalDuration: 0 }))
 
     expect(store.userInfo.avatar).toBe('/static/images/default-avatar.png')
-    expect(store.userInfo.dailyGoal).toBe(1)
+    expect(store.userInfo.goalPeriod).toBe('week')
+    expect(store.userInfo.goalMode).toBe('count')
+    expect(store.userInfo.goalCount).toBe(1)
+    expect(store.userInfo.goalDuration).toBe(30)
     expect(store.userInfo.weightUnit).toBe('kg')
   })
 

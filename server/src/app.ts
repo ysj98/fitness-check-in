@@ -10,7 +10,7 @@ import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import Fastify from 'fastify'
 import { z, ZodError } from 'zod'
-import { addChinaDays, formatChinaDate, getChinaDayRange, getChinaMonthRange } from './date.js'
+import { addChinaDays, formatChinaDate, getChinaDayRange, getChinaMonthRange, getChinaWeekRange } from './date.js'
 import { exchangeWeChatCode } from './wechat.js'
 
 declare module '@fastify/jwt' {
@@ -36,6 +36,8 @@ type AchievementCategory = 'checkin' | 'streak' | 'weight' | 'profile'
 type AchievementBadge = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND'
 type AchievementMetricKey = 'totalCheckinCount' | 'currentStreak' | 'weightRecordCount' | 'profileCompleted'
 type AchievementIcon = 'checkin' | 'streak' | 'weight' | 'profile'
+type GoalMode = 'count' | 'duration' | 'both'
+type GoalPeriod = 'week' | 'month'
 
 interface AchievementLevel {
   threshold: number
@@ -272,7 +274,10 @@ const profileSchema = z.object({
       .optional()
       .nullable(),
   ),
-  dailyGoal: z.coerce.number().int().min(1).max(9).optional(),
+  goalPeriod: z.enum(['week', 'month']).optional(),
+  goalMode: z.enum(['count', 'duration', 'both']).optional(),
+  goalCount: z.coerce.number().int().min(1).max(10).optional(),
+  goalDuration: z.coerce.number().int().min(1).max(300).optional(),
   heightCm: heightValueSchema.optional().nullable(),
 })
 
@@ -291,6 +296,84 @@ function toNumber(value: number | string | null | undefined) {
 function round(value: number, digits = 2) {
   const factor = 10 ** digits
   return Math.round((value + Number.EPSILON) * factor) / factor
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function isGoalMode(value: unknown): value is GoalMode {
+  return value === 'count' || value === 'duration' || value === 'both'
+}
+
+function isGoalPeriod(value: unknown): value is GoalPeriod {
+  return value === 'week' || value === 'month'
+}
+
+function getGoalSettings(user: NonNullable<Awaited<ReturnType<AppDb['user']['findUnique']>>>) {
+  const period = isGoalPeriod(user.goalPeriod) ? user.goalPeriod : 'week'
+  const mode = isGoalMode(user.goalMode) ? user.goalMode : 'count'
+  const countSource = Number(user.goalCount || 1)
+  const durationSource = Number(user.goalDuration || 30)
+
+  return {
+    period,
+    mode,
+    countGoal: clampNumber(Number.isFinite(countSource) ? Math.trunc(countSource) : 1, 1, 10),
+    durationGoal: clampNumber(Number.isFinite(durationSource) ? Math.trunc(durationSource) : 30, 1, 300),
+  }
+}
+
+function getGoalDateRange(period: GoalPeriod) {
+  if (period === 'week') {
+    return getChinaWeekRange()
+  }
+
+  return getChinaMonthRange(formatChinaDate(new Date()).slice(0, 7))
+}
+
+function buildGoalMetric(current: number, target: number) {
+  const safeCurrent = Math.max(0, current)
+  const safeTarget = Math.max(1, target)
+  return {
+    current: safeCurrent,
+    target: safeTarget,
+    percent: Math.min(100, Math.round((Math.min(safeCurrent, safeTarget) / safeTarget) * 100)),
+    completed: safeCurrent >= safeTarget,
+  }
+}
+
+function buildGoalProgress(params: {
+  user: NonNullable<Awaited<ReturnType<AppDb['user']['findUnique']>>>
+  goalCount: number
+  goalDurationMinutes: number
+}) {
+  const settings = getGoalSettings(params.user)
+  const count = buildGoalMetric(params.goalCount, settings.countGoal)
+  const duration = buildGoalMetric(params.goalDurationMinutes, settings.durationGoal)
+  const completed =
+    settings.mode === 'count'
+      ? count.completed
+      : settings.mode === 'duration'
+        ? duration.completed
+        : count.completed && duration.completed
+  const percent =
+    settings.mode === 'count'
+      ? count.percent
+      : settings.mode === 'duration'
+        ? duration.percent
+        : Math.min(count.percent, duration.percent)
+
+  return {
+    period: settings.period,
+    mode: settings.mode,
+    countGoal: settings.countGoal,
+    durationGoal: settings.durationGoal,
+    count,
+    duration,
+    completed,
+    percent,
+  }
 }
 
 function calculateRawBmi(weightKg: number, heightCm: number | null) {
@@ -392,8 +475,8 @@ function serializeWeightRecord(
   }
 }
 
-function buildBadges(params: { currentStreak: number; totalCount: number; todayCompleted: boolean }) {
-  const { currentStreak, totalCount, todayCompleted } = params
+function buildBadges(params: { currentStreak: number; totalCount: number; goalCompleted: boolean }) {
+  const { currentStreak, totalCount, goalCompleted } = params
 
   return [
     {
@@ -427,10 +510,10 @@ function buildBadges(params: { currentStreak: number; totalCount: number; todayC
       unlocked: totalCount >= 30,
     },
     {
-      key: 'daily_goal',
-      name: '今日达标',
-      description: '完成今日目标',
-      unlocked: todayCompleted,
+      key: 'period_goal',
+      name: '目标达成',
+      description: '完成当前周期目标',
+      unlocked: goalCompleted,
     },
   ]
 }
@@ -517,6 +600,8 @@ function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
     return null
   }
 
+  const goal = getGoalSettings(user)
+
   return {
     userId: user.id,
     username: user.openid,
@@ -525,7 +610,10 @@ function serializeUser(user: Awaited<ReturnType<AppDb['user']['findUnique']>>) {
     avatarUrl: user.avatarUrl || '',
     gender: user.gender || '',
     birthday: user.birthday || '',
-    dailyGoal: user.dailyGoal || 1,
+    goalPeriod: goal.period,
+    goalMode: goal.mode,
+    goalCount: goal.countGoal,
+    goalDuration: goal.durationGoal,
     heightCm: toNumber(user.heightCm),
     targetWeightKg: toNumber(user.targetWeightKg),
     weightUnit: user.weightUnit || 'kg',
@@ -698,7 +786,10 @@ export async function createApp(options: CreateAppOptions) {
       update: {},
       create: {
         openid: wxSession.openid,
-        dailyGoal: 1,
+        goalPeriod: 'week',
+        goalMode: 'count',
+        goalCount: 1,
+        goalDuration: 30,
         nickname: '运动达人',
       },
     })
@@ -735,7 +826,10 @@ export async function createApp(options: CreateAppOptions) {
         avatarUrl: body.avatarUrl || null,
         gender: body.gender || null,
         birthday: body.birthday || null,
-        ...(body.dailyGoal ? { dailyGoal: body.dailyGoal } : {}),
+        ...(body.goalPeriod ? { goalPeriod: body.goalPeriod } : {}),
+        ...(body.goalMode ? { goalMode: body.goalMode } : {}),
+        ...(body.goalCount ? { goalCount: body.goalCount } : {}),
+        ...(body.goalDuration ? { goalDuration: body.goalDuration } : {}),
         ...(body.heightCm !== undefined ? { heightCm: body.heightCm } : {}),
       },
     })
@@ -1075,16 +1169,10 @@ export async function createApp(options: CreateAppOptions) {
 
   app.get('/api/checkins/stats', async (request) => {
     const todayRange = getChinaDayRange()
-    const [allRecords, todayCount, user] = await Promise.all([
+    const [allRecords, user] = await Promise.all([
       app.db.checkIn.findMany({
         where: { userId: request.user.userId },
         orderBy: { checkedAt: 'desc' },
-      }),
-      app.db.checkIn.count({
-        where: {
-          userId: request.user.userId,
-          checkedAt: { gte: todayRange.start, lt: todayRange.end },
-        },
       }),
       app.db.user.findUnique({ where: { id: request.user.userId } }),
     ])
@@ -1093,17 +1181,32 @@ export async function createApp(options: CreateAppOptions) {
       error.statusCode = 401
       throw error
     }
+    const goalSettings = getGoalSettings(user)
+    const goalRange = getGoalDateRange(goalSettings.period)
     const currentStreak = calculateCurrentStreak(allRecords)
     const totalCount = allRecords.length
-    const todayGoal = user.dailyGoal || 1
-    const todayCompleted = todayCount >= todayGoal
+    const todayRecords = allRecords.filter(
+      (record) => record.checkedAt >= todayRange.start && record.checkedAt < todayRange.end,
+    )
+    const goalRecords = allRecords.filter(
+      (record) => record.checkedAt >= goalRange.start && record.checkedAt < goalRange.end,
+    )
+    const todayCount = todayRecords.length
+    const todayDurationMinutes = todayRecords.reduce((total, record) => total + record.durationMinutes, 0)
+    const goalCount = goalRecords.length
+    const goalDurationMinutes = goalRecords.reduce((total, record) => total + record.durationMinutes, 0)
+    const goalProgress = buildGoalProgress({ user, goalCount, goalDurationMinutes })
 
     return ok({
       currentStreak,
       totalCount,
-      todayGoal,
-      todayCompleted,
-      badges: buildBadges({ currentStreak, totalCount, todayCompleted }),
+      todayCount,
+      todayDurationMinutes,
+      goalCount,
+      goalDurationMinutes,
+      goalProgress,
+      goalCompleted: goalProgress.completed,
+      badges: buildBadges({ currentStreak, totalCount, goalCompleted: goalProgress.completed }),
     })
   })
 

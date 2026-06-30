@@ -6,6 +6,10 @@ export interface AppUser {
   gender?: string | null
   birthday?: string | null
   dailyGoal: number
+  goalPeriod?: string
+  goalMode?: string
+  goalCount?: number
+  goalDuration?: number
   heightCm?: number | string | null
   targetWeightKg?: number | string | null
   weightUnit?: string

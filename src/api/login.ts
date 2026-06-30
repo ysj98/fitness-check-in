@@ -1,4 +1,4 @@
-import type { IAuthLoginRes, IUserInfoRes } from './types/login'
+import type { GoalMode, GoalPeriod, IAuthLoginRes, IUserInfoRes } from './types/login'
 import { http } from '@/http/http'
 
 export interface IUserProfileUpdate {
@@ -6,7 +6,10 @@ export interface IUserProfileUpdate {
   avatarUrl?: string | null
   gender?: string | null
   birthday?: string | null
-  dailyGoal?: number
+  goalPeriod?: GoalPeriod
+  goalMode?: GoalMode
+  goalCount?: number
+  goalDuration?: number
   heightCm?: number | null
 }
 

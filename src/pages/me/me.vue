@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { AchievementBadge, AchievementCategory, AchievementSeriesProgress } from '@/api/achievements'
+import type { GoalMode, GoalPeriod } from '@/api/types/login'
 import type { ThemeMode } from '@/store'
 import { getAchievements } from '@/api/achievements'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
@@ -34,7 +35,17 @@ const genderOptions = [
   { label: '女', value: 'female' },
   { label: '其他', value: 'other' },
 ]
-const dailyGoalOptions = Array.from({ length: 9 }, (_, index) => `${index + 1}`)
+const goalModeOptions = [
+  { label: '按次数', value: 'count' as const },
+  { label: '按时长', value: 'duration' as const },
+  { label: '次数+时长', value: 'both' as const },
+]
+const goalPeriodOptions = [
+  { label: '周目标', value: 'week' as const },
+  { label: '月目标', value: 'month' as const },
+]
+const countGoalOptions = Array.from({ length: 10 }, (_, index) => index + 1)
+const durationGoalOptions = [15, 30, 45, 60, 90]
 const themeOptions = [
   { label: '浅色', value: 'light' as const },
   { label: '深色', value: 'dark' as const },
@@ -44,8 +55,18 @@ const form = reactive({
   avatarUrl: '',
   gender: '',
   birthday: '',
-  dailyGoal: 1,
+  goalPeriod: 'week' as GoalPeriod,
+  goalMode: 'count' as GoalMode,
+  goalCount: 1,
+  goalDuration: 30,
   heightCm: '',
+})
+const goalDraft = reactive({
+  period: 'week' as GoalPeriod,
+  mode: 'count' as GoalMode,
+  countGoal: 1,
+  durationOption: 30 as number | 'custom',
+  customDuration: '',
 })
 
 const avatarPreview = computed(() => avatarTempUrl.value || form.avatarUrl || '/static/images/default-avatar.png')
@@ -54,7 +75,6 @@ const genderIndex = computed(() => {
   return index >= 0 ? index : 0
 })
 const genderLabel = computed(() => genderOptions[genderIndex.value].label)
-const dailyGoalIndex = computed(() => Math.max(0, Math.min(8, form.dailyGoal - 1)))
 const achievementTotals = computed(() => getAchievementTotals(achievements.value))
 const achievementProgressText = computed(() => achievementTotals.value.text)
 const completionPercent = computed(() => achievementTotals.value.percent)
@@ -63,6 +83,16 @@ const achievementCategoryOptions = computed(() => getAchievementCategoryOptions(
 const filteredAchievementSeries = computed(() =>
   filterAchievementSeries(achievements.value, selectedAchievementCategory.value),
 )
+const goalSummary = computed(() =>
+  formatGoalSummary(form.goalPeriod, form.goalMode, form.goalCount, form.goalDuration),
+)
+const draftGoalSummary = computed(() => {
+  const duration =
+    typeof goalDraft.durationOption === 'number'
+      ? goalDraft.durationOption
+      : Number(goalDraft.customDuration.trim()) || form.goalDuration
+  return formatGoalSummary(goalDraft.period, goalDraft.mode, goalDraft.countGoal, duration)
+})
 const badgeAccentMap: Record<AchievementBadge, 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond'> = {
   BRONZE: 'bronze',
   SILVER: 'silver',
@@ -77,6 +107,7 @@ const categoryAccentMap: Record<AchievementCategory, 'green' | 'orange' | 'blue'
   profile: 'pink',
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined
+const goalSheetOpen = ref(false)
 
 onShow(() => {
   initProfile()
@@ -94,7 +125,10 @@ async function initProfile() {
   form.avatarUrl = userInfo.avatarUrl || userInfo.avatar || ''
   form.gender = userInfo.gender || ''
   form.birthday = userInfo.birthday || ''
-  form.dailyGoal = userInfo.dailyGoal || 1
+  form.goalPeriod = userInfo.goalPeriod || 'week'
+  form.goalMode = userInfo.goalMode || 'count'
+  form.goalCount = userInfo.goalCount || 1
+  form.goalDuration = userInfo.goalDuration || 30
   form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
   achievements.value = nextAchievements
   profileReady.value = true
@@ -110,17 +144,89 @@ function handleBirthdayChange(event: { detail: { value: string } }) {
   scheduleProfileSave()
 }
 
-function handleDailyGoalChange(event: { detail: { value: number } }) {
-  form.dailyGoal = Number(dailyGoalOptions[event.detail.value] || 1)
-  scheduleProfileSave()
-}
-
 function selectTheme(mode: ThemeMode) {
   if (themeStore.mode === mode) {
     return
   }
   themeStore.setMode(mode)
   triggerSuccessHaptic()
+}
+
+function formatGoalSummary(period: GoalPeriod, mode: GoalMode, countGoal: number, durationGoal: number) {
+  const periodText = period === 'month' ? '月目标' : '周目标'
+  if (mode === 'count') {
+    return `${periodText} · ${countGoal} 次`
+  }
+  if (mode === 'duration') {
+    return `${periodText} · ${durationGoal} 分钟`
+  }
+  return `${periodText} · ${countGoal} 次 · ${durationGoal} 分钟`
+}
+
+function openGoalSettingsSheet() {
+  goalDraft.period = form.goalPeriod
+  goalDraft.mode = form.goalMode
+  goalDraft.countGoal = form.goalCount
+  goalDraft.durationOption = durationGoalOptions.includes(form.goalDuration) ? form.goalDuration : 'custom'
+  goalDraft.customDuration = goalDraft.durationOption === 'custom' ? String(form.goalDuration) : ''
+  goalSheetOpen.value = true
+}
+
+function closeGoalSettingsSheet() {
+  if (!saving.value) {
+    goalSheetOpen.value = false
+  }
+}
+
+function selectGoalPeriod(period: GoalPeriod) {
+  goalDraft.period = period
+}
+
+function selectGoalMode(mode: GoalMode) {
+  goalDraft.mode = mode
+}
+
+function selectGoalDurationOption(value: number | 'custom') {
+  goalDraft.durationOption = value
+  if (value !== 'custom') {
+    goalDraft.customDuration = ''
+  }
+}
+
+function resolveGoalDuration() {
+  if (typeof goalDraft.durationOption === 'number') {
+    return goalDraft.durationOption
+  }
+  const value = goalDraft.customDuration.trim()
+  if (!value || !/^\d+$/.test(value)) {
+    uni.showToast({ title: '请输入有效运动时长', icon: 'none' })
+    return null
+  }
+  const duration = Number(value)
+  if (duration < 1 || duration > 300) {
+    uni.showToast({ title: '运动时长需为 1-300 分钟', icon: 'none' })
+    return null
+  }
+  return duration
+}
+
+async function saveGoalSettings() {
+  const durationGoal =
+    goalDraft.mode === 'duration' || goalDraft.mode === 'both'
+      ? resolveGoalDuration()
+      : typeof goalDraft.durationOption === 'number'
+        ? goalDraft.durationOption
+        : form.goalDuration
+  if (!durationGoal) {
+    return
+  }
+  form.goalPeriod = goalDraft.period
+  form.goalMode = goalDraft.mode
+  form.goalCount = goalDraft.countGoal
+  form.goalDuration = durationGoal
+  goalSheetOpen.value = false
+  await saveProfile()
+  uni.showToast({ title: '目标设置已更新', icon: 'success' })
 }
 
 function selectAchievementCategory(category: AchievementCategory) {
@@ -216,7 +322,10 @@ async function saveProfile() {
       avatarUrl: form.avatarUrl.trim() || null,
       gender: form.gender || null,
       birthday: form.birthday || null,
-      dailyGoal: form.dailyGoal,
+      goalPeriod: form.goalPeriod,
+      goalMode: form.goalMode,
+      goalCount: form.goalCount,
+      goalDuration: form.goalDuration,
       heightCm,
     })
     userStore.setUserInfo(userInfo)
@@ -254,8 +363,8 @@ async function saveProfile() {
                 <text class="stat-value numeric">{{ achievementProgressText }}</text>
               </view>
               <view class="profile-stat">
-                <text class="stat-label">每日目标</text>
-                <text class="stat-value numeric">{{ form.dailyGoal }} 次</text>
+                <text class="stat-label">目标设置</text>
+                <text class="stat-value numeric">{{ goalSummary }}</text>
               </view>
             </view>
           </view>
@@ -308,14 +417,12 @@ async function saveProfile() {
             </view>
           </picker>
 
-          <picker :value="dailyGoalIndex" :range="dailyGoalOptions" @change="handleDailyGoalChange">
-            <view class="field picker-field">
-              <app-icon name="target" accent="green" size="sm" />
-              <text class="field-label">每日目标</text>
-              <view class="field-value"> {{ form.dailyGoal }} 次 </view>
-              <text class="field-chevron i-carbon-chevron-right" />
-            </view>
-          </picker>
+          <button class="field picker-field goal-field-button" hover-class="goal-field-pressed" @click="openGoalSettingsSheet">
+            <app-icon name="target" accent="green" size="sm" />
+            <text class="field-label">目标设置</text>
+            <view class="field-value"> {{ goalSummary }} </view>
+            <text class="field-chevron i-carbon-chevron-right" />
+          </button>
 
           <view class="field">
             <app-icon name="i-carbon-ruler" accent="gold" size="sm" />
@@ -373,6 +480,92 @@ async function saveProfile() {
         @select="openAchievementDetail"
       />
     </view>
+
+    <app-sheet
+      v-if="goalSheetOpen"
+      title="目标设置"
+      close-text="取消"
+      :show-save="false"
+      compact
+      @close="closeGoalSettingsSheet"
+    >
+      <view class="goal-settings-sheet">
+        <view class="goal-settings-summary">
+          <text>当前设置</text>
+          <text class="numeric">{{ draftGoalSummary }}</text>
+        </view>
+
+        <view class="goal-setting-card">
+          <text class="goal-setting-title">目标周期</text>
+          <app-segmented-control :model-value="goalDraft.period" :options="goalPeriodOptions" @change="selectGoalPeriod" />
+        </view>
+
+        <view class="goal-setting-card">
+          <text class="goal-setting-title">目标模式</text>
+          <app-segmented-control :model-value="goalDraft.mode" :options="goalModeOptions" @change="selectGoalMode" />
+        </view>
+
+        <view v-if="goalDraft.mode === 'count' || goalDraft.mode === 'both'" class="goal-setting-card">
+          <text class="goal-setting-title">打卡次数</text>
+          <view class="goal-option-grid count-grid">
+            <button
+              v-for="count in countGoalOptions"
+              :key="count"
+              class="goal-option"
+              :class="{ active: goalDraft.countGoal === count }"
+              hover-class="goal-option-pressed"
+              @click.stop="goalDraft.countGoal = count"
+            >
+              {{ count }} 次
+            </button>
+          </view>
+        </view>
+
+        <view v-if="goalDraft.mode === 'duration' || goalDraft.mode === 'both'" class="goal-setting-card">
+          <text class="goal-setting-title">运动时长</text>
+          <view class="goal-option-grid duration-grid">
+            <button
+              v-for="minutes in durationGoalOptions"
+              :key="minutes"
+              class="goal-option"
+              :class="{ active: goalDraft.durationOption === minutes }"
+              hover-class="goal-option-pressed"
+              @click.stop="selectGoalDurationOption(minutes)"
+            >
+              {{ minutes }} 分钟
+            </button>
+            <button
+              class="goal-option"
+              :class="{ active: goalDraft.durationOption === 'custom' }"
+              hover-class="goal-option-pressed"
+              @click.stop="selectGoalDurationOption('custom')"
+            >
+              自定义
+            </button>
+          </view>
+          <view v-if="goalDraft.durationOption === 'custom'" class="goal-custom-row">
+            <input
+              v-model="goalDraft.customDuration"
+              class="goal-custom-input numeric"
+              type="number"
+              :maxlength="3"
+              placeholder="1-300"
+              placeholder-class="placeholder"
+            />
+            <text>分钟</text>
+          </view>
+        </view>
+
+        <view class="goal-action-bar">
+          <button class="goal-action secondary" hover-class="goal-action-pressed" @click.stop="closeGoalSettingsSheet">
+            取消
+          </button>
+          <button class="goal-action primary" :disabled="saving" hover-class="goal-action-pressed" @click.stop="saveGoalSettings">
+            {{ saving ? '保存中' : '保存目标' }}
+          </button>
+        </view>
+      </view>
+    </app-sheet>
 
     <app-sheet
       v-if="selectedAchievementSeries"
@@ -600,6 +793,21 @@ async function saveProfile() {
   border-bottom: 0;
 }
 
+.goal-field-button {
+  width: auto;
+  text-align: left;
+  background: transparent;
+  line-height: normal;
+}
+
+.goal-field-button::after {
+  border: 0;
+}
+
+.goal-field-pressed {
+  opacity: 0.76;
+}
+
 .field-chevron {
   flex: 0 0 auto;
   color: var(--app-label-tertiary);
@@ -644,6 +852,148 @@ async function saveProfile() {
 
 .field-unit-input .field-input {
   flex: 0 1 180rpx;
+}
+
+.goal-settings-sheet {
+  padding-top: 10rpx;
+}
+
+.goal-settings-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72rpx;
+  margin: 6rpx 0 18rpx;
+  padding: 0 24rpx;
+  border: 1rpx solid rgba(34, 199, 111, 0.18);
+  border-radius: 24rpx;
+  color: var(--app-green);
+  background: rgba(34, 199, 111, 0.08);
+  font-size: 25rpx;
+  font-weight: 760;
+  box-sizing: border-box;
+}
+
+.goal-setting-card {
+  margin-bottom: 16rpx;
+  padding: 22rpx;
+  border-radius: 26rpx;
+  background: #fff;
+  box-shadow: 0 12rpx 32rpx rgba(42, 111, 76, 0.06);
+  box-sizing: border-box;
+}
+
+.goal-setting-title {
+  display: block;
+  margin-bottom: 18rpx;
+  color: var(--app-label-primary);
+  font-size: 26rpx;
+  font-weight: 780;
+}
+
+.goal-option-grid {
+  display: grid;
+  gap: 14rpx;
+}
+
+.count-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.duration-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.goal-option {
+  min-width: 0;
+  height: 72rpx;
+  padding: 0 10rpx;
+  border: 2rpx solid transparent;
+  border-radius: 999rpx;
+  color: var(--app-label-secondary);
+  background: #eef6f1;
+  font-size: 22rpx;
+  font-weight: 720;
+  line-height: 68rpx;
+  box-sizing: border-box;
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out,
+    border-color var(--app-motion-fast) ease-out,
+    background var(--app-motion-fast) ease-out;
+}
+
+.goal-option.active {
+  border-color: rgba(34, 199, 111, 0.72);
+  color: var(--app-green);
+  background: #ddf6e8;
+}
+
+.goal-option-pressed,
+.goal-action-pressed {
+  opacity: 0.82;
+  transform: scale(0.97);
+}
+
+.goal-custom-row {
+  display: flex;
+  align-items: center;
+  min-height: 82rpx;
+  margin-top: 16rpx;
+  padding: 0 22rpx;
+  border: 2rpx solid rgba(34, 199, 111, 0.18);
+  border-radius: 22rpx;
+  color: var(--app-label-secondary);
+  background: #f4faf6;
+  font-size: 24rpx;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.goal-custom-input {
+  flex: 1;
+  min-width: 0;
+  height: 82rpx;
+  color: var(--app-label-primary);
+  font-size: 28rpx;
+  font-weight: 780;
+}
+
+.goal-action-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1.45fr;
+  gap: 16rpx;
+  padding: 14rpx 0 2rpx;
+  background: linear-gradient(180deg, rgba(247, 251, 248, 0), #f7fbf8 24rpx);
+}
+
+.goal-action {
+  height: 88rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 88rpx;
+  transition:
+    opacity var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) ease-out;
+}
+
+.goal-action.secondary {
+  color: var(--app-label-secondary);
+  background: #eaf2ed;
+}
+
+.goal-action.primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--app-green), var(--app-green-deep));
+  box-shadow: 0 16rpx 32rpx rgba(32, 196, 107, 0.22);
+}
+
+.goal-action[disabled] {
+  opacity: 0.58;
 }
 
 .appearance-card-content {

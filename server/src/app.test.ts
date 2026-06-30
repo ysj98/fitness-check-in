@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
-import { addChinaDays, formatChinaDate, getChinaDayRange } from './date.js'
+import { addChinaDays, formatChinaDate, getChinaDayRange, getChinaMonthRange } from './date.js'
 
 function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; weightRecords: AppWeightRecord[] } {
   const users: AppUser[] = []
@@ -32,6 +32,10 @@ function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; w
             gender: null,
             birthday: null,
             dailyGoal: args.create.dailyGoal || 1,
+            goalPeriod: args.create.goalPeriod || 'week',
+            goalMode: args.create.goalMode || 'count',
+            goalCount: args.create.goalCount || 1,
+            goalDuration: args.create.goalDuration || 30,
             heightCm: null,
             targetWeightKg: null,
             weightUnit: 'kg',
@@ -258,7 +262,12 @@ describe('fitness check-in api', () => {
     expect(response.statusCode).toBe(200)
     expect(response.json().data.token).toBeTruthy()
     expect(response.json().data.user.username).toBe('openid-abc')
-    expect(response.json().data.user.dailyGoal).toBe(1)
+    expect(response.json().data.user).toMatchObject({
+      goalPeriod: 'week',
+      goalMode: 'count',
+      goalCount: 1,
+      goalDuration: 30,
+    })
   })
 
   it('creates check-ins and returns today summary', async () => {
@@ -563,14 +572,20 @@ describe('fitness check-in api', () => {
         avatarUrl: 'https://example.com/avatar.png',
         gender: 'other',
         birthday: '1995-05-20',
-        dailyGoal: 3,
+        goalPeriod: 'month',
+        goalMode: 'both',
+        goalCount: 3,
+        goalDuration: 45,
       },
     })
 
     expect(response.json().data.nickname).toBe('Alex')
     expect(response.json().data.gender).toBe('other')
     expect(response.json().data.birthday).toBe('1995-05-20')
-    expect(response.json().data.dailyGoal).toBe(3)
+    expect(response.json().data.goalPeriod).toBe('month')
+    expect(response.json().data.goalMode).toBe('both')
+    expect(response.json().data.goalCount).toBe(3)
+    expect(response.json().data.goalDuration).toBe(45)
   })
 
   it('normalizes empty optional profile fields to null', async () => {
@@ -590,7 +605,10 @@ describe('fitness check-in api', () => {
         avatarUrl: '',
         gender: '',
         birthday: '',
-        dailyGoal: 3,
+        goalPeriod: 'week',
+        goalMode: 'duration',
+        goalCount: 3,
+        goalDuration: 60,
       },
     })
 
@@ -602,7 +620,7 @@ describe('fitness check-in api', () => {
     })
   })
 
-  it('rejects invalid daily goal', async () => {
+  it('rejects invalid goal settings', async () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
@@ -616,15 +634,18 @@ describe('fitness check-in api', () => {
       headers: { authorization: `Bearer ${session.token}` },
       payload: {
         nickname: 'Alex',
-        dailyGoal: 10,
+        goalPeriod: 'year',
+        goalMode: 'both',
+        goalCount: 11,
+        goalDuration: 301,
       },
     })
 
     expect(response.statusCode).toBe(400)
-    expect(response.json().message).toContain('dailyGoal')
+    expect(response.json().message).toContain('goalPeriod')
   })
 
-  it('returns goal progress and badges in stats', async () => {
+  it('returns count goal progress and badges in stats', async () => {
     const db = createMemoryDb()
     const app = await createApp({
       db,
@@ -638,7 +659,10 @@ describe('fitness check-in api', () => {
       headers: { authorization: `Bearer ${session.token}` },
       payload: {
         nickname: 'Alex',
-        dailyGoal: 2,
+        goalPeriod: 'week',
+        goalMode: 'count',
+        goalCount: 2,
+        goalDuration: 60,
       },
     })
     db.checkIns.push(
@@ -656,10 +680,142 @@ describe('fitness check-in api', () => {
     const data = response.json().data
 
     expect(data.totalCount).toBe(4)
-    expect(data.todayGoal).toBe(2)
-    expect(data.todayCompleted).toBe(true)
+    expect(data.todayCount).toBe(2)
+    expect(data.todayDurationMinutes).toBe(60)
+    expect(data.goalCount).toBe(3)
+    expect(data.goalDurationMinutes).toBe(90)
+    expect(data.goalProgress).toMatchObject({
+      period: 'week',
+      mode: 'count',
+      countGoal: 2,
+      durationGoal: 60,
+      completed: true,
+      count: { current: 3, target: 2, completed: true, percent: 100 },
+    })
+    expect(data.goalCompleted).toBe(true)
     expect(data.badges.find((badge: { key: string }) => badge.key === 'streak_3').unlocked).toBe(true)
-    expect(data.badges.find((badge: { key: string }) => badge.key === 'daily_goal').unlocked).toBe(true)
+    expect(data.badges.find((badge: { key: string }) => badge.key === 'period_goal').unlocked).toBe(true)
+  })
+
+  it('requires both count and duration when goal mode is both', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    const authorization = { authorization: `Bearer ${session.token}` }
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: authorization,
+      payload: {
+        nickname: 'Alex',
+        goalPeriod: 'week',
+        goalMode: 'both',
+        goalCount: 2,
+        goalDuration: 60,
+      },
+    })
+    db.checkIns.push(
+      createCheckInRecord({
+        userId: session.user.userId,
+        id: 1,
+        checkedAt: new Date(),
+        durationMinutes: 45,
+      }),
+      createCheckInRecord({
+        userId: session.user.userId,
+        id: 2,
+        checkedAt: new Date(),
+        durationMinutes: 10,
+      }),
+    )
+
+    const firstResponse = await app.inject({
+      method: 'GET',
+      url: '/api/checkins/stats',
+      headers: authorization,
+    })
+
+    expect(firstResponse.json().data.goalProgress).toMatchObject({
+      period: 'week',
+      mode: 'both',
+      completed: false,
+      count: { current: 2, completed: true },
+      duration: { current: 55, completed: false },
+    })
+    expect(firstResponse.json().data.goalCompleted).toBe(false)
+
+    db.checkIns.push(
+      createCheckInRecord({
+        userId: session.user.userId,
+        id: 3,
+        checkedAt: new Date(),
+        durationMinutes: 5,
+      }),
+    )
+    const secondResponse = await app.inject({
+      method: 'GET',
+      url: '/api/checkins/stats',
+      headers: authorization,
+    })
+
+    expect(secondResponse.json().data.goalCompleted).toBe(true)
+    expect(secondResponse.json().data.badges.find((badge: { key: string }) => badge.key === 'period_goal').unlocked).toBe(true)
+  })
+
+  it('calculates monthly duration goal progress from the current month', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+    const authorization = { authorization: `Bearer ${session.token}` }
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/profile',
+      headers: authorization,
+      payload: {
+        nickname: 'Alex',
+        goalPeriod: 'month',
+        goalMode: 'duration',
+        goalCount: 2,
+        goalDuration: 60,
+      },
+    })
+    const monthStart = getChinaMonthRange(formatChinaDate(new Date()).slice(0, 7)).start
+    db.checkIns.push(
+      createCheckInRecord({
+        userId: session.user.userId,
+        id: 1,
+        checkedAt: new Date(monthStart.getTime() + 12 * 60 * 60 * 1000),
+        durationMinutes: 30,
+      }),
+      createCheckInRecord({
+        userId: session.user.userId,
+        id: 2,
+        checkedAt: new Date(monthStart.getTime() + 3 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000),
+        durationMinutes: 30,
+      }),
+    )
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/checkins/stats',
+      headers: authorization,
+    })
+
+    expect(response.json().data.goalProgress).toMatchObject({
+      period: 'month',
+      mode: 'duration',
+      completed: true,
+      duration: { current: 60, target: 60, completed: true, percent: 100 },
+    })
+    expect(response.json().data.goalCompleted).toBe(true)
   })
 
   it('rejects avatar upload without login', async () => {
@@ -712,7 +868,10 @@ describe('fitness check-in api', () => {
         avatarUrl,
         gender: 'other',
         birthday: '1995-05-20',
-        dailyGoal: 1,
+        goalPeriod: 'week',
+        goalMode: 'count',
+        goalCount: 1,
+        goalDuration: 30,
       },
     })
 
@@ -1161,7 +1320,10 @@ describe('fitness check-in api', () => {
         avatarUrl: 'https://example.com/avatar.png',
         gender: 'other',
         birthday: '1995-05-20',
-        dailyGoal: 1,
+        goalPeriod: 'week',
+        goalMode: 'count',
+        goalCount: 1,
+        goalDuration: 30,
         heightCm: 178,
       },
     })

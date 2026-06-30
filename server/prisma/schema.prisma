@@ -15,6 +15,10 @@ model User {
   gender         String?
   birthday       String?
   dailyGoal      Int            @default(1)
+  goalPeriod     String         @default("week") @db.VarChar(16)
+  goalMode       String         @default("count") @db.VarChar(16)
+  goalCount      Int            @default(1)
+  goalDuration   Int            @default(30)
   heightCm       Decimal?       @db.Decimal(5, 2)
   targetWeightKg Decimal?       @db.Decimal(5, 2)
   weightUnit     String         @default("kg") @db.VarChar(8)

@@ -1,4 +1,6 @@
 export type WeightUnit = 'kg' | 'jin'
+export type GoalPeriod = 'week' | 'month'
+export type GoalMode = 'count' | 'duration' | 'both'
 
 export interface IUserInfoRes {
   userId: number
@@ -8,7 +10,10 @@ export interface IUserInfoRes {
   avatarUrl: string
   gender: string
   birthday: string
-  dailyGoal: number
+  goalPeriod: GoalPeriod
+  goalMode: GoalMode
+  goalCount: number
+  goalDuration: number
   heightCm: number | null
   targetWeightKg: number | null
   weightUnit: WeightUnit

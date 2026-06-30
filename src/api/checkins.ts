@@ -1,4 +1,5 @@
 import { http } from '@/http/http'
+import type { GoalMode, GoalPeriod } from './types/login'
 
 export interface CheckInRecord {
   id: number
@@ -42,11 +43,33 @@ export interface CheckInBadge {
   unlocked: boolean
 }
 
+export interface GoalMetricProgress {
+  current: number
+  target: number
+  percent: number
+  completed: boolean
+}
+
+export interface GoalProgress {
+  period: GoalPeriod
+  mode: GoalMode
+  countGoal: number
+  durationGoal: number
+  count: GoalMetricProgress
+  duration: GoalMetricProgress
+  completed: boolean
+  percent: number
+}
+
 export interface CheckInStatsRes {
   currentStreak: number
   totalCount: number
-  todayGoal: number
-  todayCompleted: boolean
+  todayCount: number
+  todayDurationMinutes: number
+  goalCount: number
+  goalDurationMinutes: number
+  goalProgress: GoalProgress
+  goalCompleted: boolean
   badges: CheckInBadge[]
 }
 

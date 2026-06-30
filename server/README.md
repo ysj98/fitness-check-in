@@ -169,6 +169,26 @@ pm2 start ecosystem.config.cjs --env production
 - `DELETE /api/weights/:id`
 - `GET /uploads/avatars/:file`
 
+### 用户目标说明
+
+`PATCH /api/user/profile` 支持维护周目标 / 月目标：
+
+```json
+{
+  "nickname": "Alex",
+  "goalPeriod": "week",
+  "goalMode": "both",
+  "goalCount": 2,
+  "goalDuration": 60
+}
+```
+
+- `goalPeriod` 支持 `week`、`month`。
+- `goalMode` 支持 `count`、`duration`、`both`。
+- `goalCount` 范围为 1-10 次。
+- `goalDuration` 范围为 1-300 分钟。
+- 新用户默认为周目标、按次数、1 次、30 分钟。
+
 ### 打卡接口说明
 
 `POST /api/checkins` 创建正常打卡记录，请求体：
@@ -234,6 +254,26 @@ pm2 start ecosystem.config.cjs --env production
   },
   "backfillUsed": 1,
   "backfillLimit": 3
+}
+```
+
+`GET /api/checkins/stats` 返回当前周期目标进度。`both` 模式下，当前周或当前月的次数和时长都达成时 `goalCompleted` 才为 `true`，成就中的“目标达成”也使用该规则：
+
+```json
+{
+  "todayCount": 2,
+  "todayDurationMinutes": 60,
+  "goalCount": 2,
+  "goalDurationMinutes": 60,
+  "goalProgress": {
+    "period": "week",
+    "mode": "both",
+    "countGoal": 2,
+    "durationGoal": 60,
+    "completed": true,
+    "percent": 100
+  },
+  "goalCompleted": true
 }
 ```
 
