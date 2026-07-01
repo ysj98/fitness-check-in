@@ -194,6 +194,20 @@ const targetGoalStatusText = computed(() => {
       : `还差 ${durationLeft} 分钟`
 })
 
+const targetGoalCompletedText = computed(() => {
+  const progress = targetGoalProgress.value
+  if (!progress) {
+    return ''
+  }
+  if (progress.mode === 'count') {
+    return `已完成 ${progress.count.current}/${progress.count.target} 次`
+  }
+  if (progress.mode === 'duration') {
+    return `已完成 ${progress.duration.current}/${progress.duration.target} 分钟`
+  }
+  return `已完成 ${progress.count.current}/${progress.count.target} 次 · ${progress.duration.current}/${progress.duration.target} 分钟`
+})
+
 const todayTotalDuration = computed(() =>
   todayRecords.value.reduce((total, record) => total + record.durationMinutes, 0),
 )
@@ -713,9 +727,10 @@ function formatTime(value: string) {
       <app-card accent="green" elevated>
         <view class="energy-card-content" :class="{ pulse: successPulse }">
           <view v-if="targetGoalProgress" class="goal-panel">
-            <view>
+            <view class="goal-copy">
               <text class="goal-caption">{{ targetGoalTitle }}</text>
               <text class="goal-status">{{ targetGoalStatusText }}</text>
+              <text class="goal-completed numeric">{{ targetGoalCompletedText }}</text>
             </view>
             <text class="goal-percent numeric">{{ targetGoalProgress.percent }}%</text>
           </view>
@@ -1135,8 +1150,14 @@ function formatTime(value: string) {
   background: var(--app-fill);
 }
 
+.goal-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .goal-caption,
 .goal-status,
+.goal-completed,
 .goal-percent {
   display: block;
 }
@@ -1152,6 +1173,14 @@ function formatTime(value: string) {
   color: var(--app-label-primary);
   font-size: 25rpx;
   font-weight: 760;
+}
+
+.goal-completed {
+  margin-top: 8rpx;
+  color: var(--app-label-secondary);
+  font-size: 22rpx;
+  font-weight: 760;
+  line-height: 1.25;
 }
 
 .goal-percent {
