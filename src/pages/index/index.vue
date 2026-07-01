@@ -940,13 +940,13 @@ function formatTime(value: string) {
 
         <view class="checkin-field sheet-choice-card">
           <text class="checkin-field-title">运动类型</text>
-          <view class="sheet-option-grid sport-options">
+          <view class="sheet-option-grid option-grid cols-4 sport-options">
             <button
               v-for="type in sportTypes"
               :key="type"
-              class="sheet-option sport-option"
+              class="sheet-option option-pill sport-option"
               :class="{ active: selectedSportType === type }"
-              hover-class="sheet-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectedSportType = type"
             >
               {{ type }}
@@ -956,21 +956,21 @@ function formatTime(value: string) {
 
         <view class="checkin-field sheet-choice-card">
           <text class="checkin-field-title">运动时长</text>
-          <view class="sheet-option-grid duration-options">
+          <view class="sheet-option-grid option-grid cols-3 duration-options">
             <button
               v-for="minutes in durationOptions"
               :key="minutes"
-              class="sheet-option duration-option"
+              class="sheet-option option-pill duration-option"
               :class="{ active: selectedDurationOption === minutes }"
-              hover-class="sheet-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectDurationOption(minutes)"
             >
               {{ minutes }} 分钟
             </button>
             <button
-              class="sheet-option duration-option"
+              class="sheet-option option-pill duration-option"
               :class="{ active: selectedDurationOption === 'custom' }"
-              hover-class="sheet-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectDurationOption('custom')"
             >
               自定义
@@ -1022,13 +1022,13 @@ function formatTime(value: string) {
         </view>
         <view class="backfill-field sheet-choice-card">
           <text class="backfill-field-title">运动类型</text>
-          <view class="sheet-option-grid sport-options">
+          <view class="sheet-option-grid option-grid cols-4 sport-options">
             <button
               v-for="type in sportTypes"
               :key="type"
-              class="sheet-option sport-option"
+              class="sheet-option option-pill sport-option"
               :class="{ active: selectedBackfillSportType === type }"
-              hover-class="sheet-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectedBackfillSportType = type"
             >
               {{ type }}
@@ -1037,21 +1037,21 @@ function formatTime(value: string) {
         </view>
         <view class="backfill-field sheet-choice-card">
           <text class="backfill-field-title">运动时长</text>
-          <view class="sheet-option-grid duration-options">
+          <view class="sheet-option-grid option-grid cols-3 duration-options">
             <button
               v-for="minutes in durationOptions"
               :key="minutes"
-              class="sheet-option duration-option"
+              class="sheet-option option-pill duration-option"
               :class="{ active: selectedBackfillDurationOption === minutes }"
-              hover-class="sheet-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectBackfillDurationOption(minutes)"
             >
               {{ minutes }} 分钟
             </button>
             <button
-              class="sheet-option duration-option"
+              class="sheet-option option-pill duration-option"
               :class="{ active: selectedBackfillDurationOption === 'custom' }"
-              hover-class="sheet-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectBackfillDurationOption('custom')"
             >
               自定义
@@ -1070,13 +1070,13 @@ function formatTime(value: string) {
         </view>
         <view class="backfill-field sheet-choice-card">
           <text class="backfill-field-title">补签原因</text>
-          <view class="reason-options">
+          <view class="reason-options option-grid cols-3">
             <button
               v-for="reason in backfillReasons"
               :key="reason"
-              class="reason-option"
+              class="reason-option option-pill"
               :class="{ active: selectedBackfillReason === reason }"
-              hover-class="reason-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectBackfillReason(reason)"
             >
               {{ reason }}
@@ -1812,58 +1812,12 @@ function formatTime(value: string) {
 }
 
 .sheet-option-grid {
-  display: grid;
-  gap: 14rpx;
-}
-
-.sport-options {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.duration-options {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
 }
 
 .sheet-option,
 .reason-option {
-  min-width: 0;
-  height: 72rpx;
-  padding: 0 12rpx;
-  border: 2rpx solid transparent;
-  border-radius: 999rpx;
-  color: var(--app-label-secondary);
-  background: #EEF6F1;
-  font-size: 23rpx;
-  font-weight: 720;
-  line-height: 68rpx;
-  box-sizing: border-box;
-  transition:
-    transform var(--app-motion-fast) ease-out,
-    opacity var(--app-motion-fast) ease-out,
-    border-color var(--app-motion-fast) ease-out,
-    background var(--app-motion-fast) ease-out;
-}
-
-.sport-option {
-  height: 72rpx;
-}
-
-.duration-option {
-  height: 72rpx;
-}
-
-.sheet-option.active,
-.reason-option.active {
-  border-color: rgba(34, 199, 111, 0.72);
-  color: var(--app-green);
-  background: #DDF6E8;
-}
-
-.sheet-option-pressed,
-.reason-option-pressed,
-.sheet-action-pressed {
-  opacity: 0.82;
-  transform: scale(0.97);
+  font-size: 22rpx;
 }
 
 .custom-duration-row {
@@ -1929,13 +1883,10 @@ function formatTime(value: string) {
 }
 
 .reason-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14rpx;
+  width: 100%;
 }
 
 .reason-option {
-  width: 100%;
   font-size: 22rpx;
 }
 
@@ -1966,6 +1917,11 @@ function formatTime(value: string) {
   transition:
     opacity var(--app-motion-fast) ease-out,
     transform var(--app-motion-fast) ease-out;
+}
+
+.sheet-action-pressed {
+  opacity: 0.82;
+  transform: scale(0.97);
 }
 
 .sheet-action.secondary {

@@ -133,6 +133,125 @@ button::after {
   font-variant-numeric: tabular-nums;
 }
 
+.segment-control {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 4rpx;
+  width: 100%;
+  padding: 5rpx;
+  border: 1rpx solid var(--app-separator);
+  border-radius: 18rpx;
+  background: var(--app-fill);
+  box-sizing: border-box;
+}
+
+.segment-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  height: 58rpx;
+  padding: 0 10rpx;
+  border: 2rpx solid transparent;
+  border-radius: 14rpx;
+  color: var(--app-label-secondary);
+  background: rgba(238, 246, 241, 0.78);
+  font-size: 23rpx;
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition:
+    color var(--app-motion-fast) ease-out,
+    background-color var(--app-motion-fast) ease-out,
+    border-color var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out,
+    transform var(--app-motion-fast) var(--app-ease-out);
+}
+
+.segment-item.active {
+  border-color: rgba(34, 199, 111, 0.72);
+  color: var(--app-green);
+  background: #ddf6e8;
+}
+
+.segment-item.disabled,
+.segment-item[disabled] {
+  opacity: 0.42;
+}
+
+.segment-item-pressed {
+  opacity: 0.82;
+  transform: scale(0.97);
+}
+
+.option-grid {
+  display: grid;
+  gap: 14rpx;
+  width: 100%;
+}
+
+.option-grid.cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.option-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.option-grid.cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.option-grid.cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.option-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+  height: 72rpx;
+  padding: 0 10rpx;
+  border: 2rpx solid transparent;
+  border-radius: var(--app-pill-radius);
+  color: var(--app-label-secondary);
+  background: #eef6f1;
+  font-size: 23rpx;
+  font-weight: 720;
+  line-height: 1.18;
+  text-align: center;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition:
+    transform var(--app-motion-fast) ease-out,
+    opacity var(--app-motion-fast) ease-out,
+    border-color var(--app-motion-fast) ease-out,
+    color var(--app-motion-fast) ease-out,
+    background-color var(--app-motion-fast) ease-out;
+}
+
+.option-pill.active {
+  border-color: rgba(34, 199, 111, 0.72);
+  color: var(--app-green);
+  background: #ddf6e8;
+}
+
+.option-pill.disabled,
+.option-pill[disabled] {
+  opacity: 0.42;
+}
+
+.option-pill-pressed {
+  opacity: 0.82;
+  transform: scale(0.97);
+}
+
 .app-enter {
   animation: app-enter var(--app-motion-normal) var(--app-ease-out) both;
 }

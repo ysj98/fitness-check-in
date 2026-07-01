@@ -541,13 +541,13 @@ async function saveProfile() {
 
         <view v-if="goalDraft.mode === 'count' || goalDraft.mode === 'both'" class="goal-setting-card">
           <text class="goal-setting-title">打卡次数</text>
-          <view class="goal-option-grid count-grid">
+          <view class="goal-option-grid option-grid cols-5 count-grid">
             <button
               v-for="count in countGoalOptions"
               :key="count"
-              class="goal-option"
+              class="goal-option option-pill"
               :class="{ active: goalDraft.countGoal === count }"
-              hover-class="goal-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="goalDraft.countGoal = count"
             >
               {{ count }} 次
@@ -557,21 +557,21 @@ async function saveProfile() {
 
         <view v-if="goalDraft.mode === 'duration' || goalDraft.mode === 'both'" class="goal-setting-card">
           <text class="goal-setting-title">运动时长</text>
-          <view class="goal-option-grid duration-grid">
+          <view class="goal-option-grid option-grid cols-3 duration-grid">
             <button
               v-for="minutes in durationGoalOptions"
               :key="minutes"
-              class="goal-option"
+              class="goal-option option-pill"
               :class="{ active: goalDraft.durationOption === minutes }"
-              hover-class="goal-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectGoalDurationOption(minutes)"
             >
               {{ minutes }} 分钟
             </button>
             <button
-              class="goal-option"
+              class="goal-option option-pill"
               :class="{ active: goalDraft.durationOption === 'custom' }"
-              hover-class="goal-option-pressed"
+              hover-class="option-pill-pressed"
               @click.stop="selectGoalDurationOption('custom')"
             >
               自定义
@@ -926,44 +926,13 @@ async function saveProfile() {
 }
 
 .goal-option-grid {
-  display: grid;
-  gap: 14rpx;
-}
-
-.count-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.duration-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
 }
 
 .goal-option {
-  min-width: 0;
-  height: 72rpx;
-  padding: 0 10rpx;
-  border: 2rpx solid transparent;
-  border-radius: 999rpx;
-  color: var(--app-label-secondary);
-  background: #eef6f1;
   font-size: 22rpx;
-  font-weight: 720;
-  line-height: 68rpx;
-  box-sizing: border-box;
-  transition:
-    transform var(--app-motion-fast) ease-out,
-    opacity var(--app-motion-fast) ease-out,
-    border-color var(--app-motion-fast) ease-out,
-    background var(--app-motion-fast) ease-out;
 }
 
-.goal-option.active {
-  border-color: rgba(34, 199, 111, 0.72);
-  color: var(--app-green);
-  background: #ddf6e8;
-}
-
-.goal-option-pressed,
 .goal-action-pressed {
   opacity: 0.82;
   transform: scale(0.97);
@@ -1083,14 +1052,7 @@ async function saveProfile() {
 .achievement-filter-shell :deep(.segment-button) {
   height: 52rpx;
   padding: 0 6rpx;
-  color: var(--app-label-secondary);
   font-size: 19rpx;
-  line-height: 52rpx;
-}
-
-.achievement-filter-shell :deep(.segment-button.active) {
-  color: var(--app-label-primary);
-  box-shadow: 0 5rpx 14rpx rgba(31, 88, 58, 0.075);
 }
 
 .series-grid {
