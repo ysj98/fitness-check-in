@@ -39,6 +39,28 @@ type AchievementIcon = 'checkin' | 'streak' | 'weight' | 'profile'
 type GoalMode = 'count' | 'duration' | 'both'
 type GoalPeriod = 'week' | 'month'
 
+const goalRules: Record<
+  GoalPeriod,
+  { countMin: number; countMax: number; durationMin: number; durationMax: number; defaultCount: number; defaultDuration: number }
+> = {
+  week: {
+    countMin: 1,
+    countMax: 14,
+    durationMin: 30,
+    durationMax: 1500,
+    defaultCount: 4,
+    defaultDuration: 180,
+  },
+  month: {
+    countMin: 1,
+    countMax: 60,
+    durationMin: 100,
+    durationMax: 6000,
+    defaultCount: 20,
+    defaultDuration: 800,
+  },
+}
+
 interface AchievementLevel {
   threshold: number
   title: string
@@ -262,24 +284,49 @@ const weightSettingsSchema = z.object({
 
 const emptyStringToNull = (value: unknown) => (value === '' ? null : value)
 
-const profileSchema = z.object({
-  nickname: z.string().trim().min(1).max(30),
-  avatarUrl: z.preprocess(emptyStringToNull, z.string().trim().max(500).optional().nullable()),
-  gender: z.preprocess(emptyStringToNull, z.enum(['male', 'female', 'other']).optional().nullable()),
-  birthday: z.preprocess(
-    emptyStringToNull,
-    z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .optional()
-      .nullable(),
-  ),
-  goalPeriod: z.enum(['week', 'month']).optional(),
-  goalMode: z.enum(['count', 'duration', 'both']).optional(),
-  goalCount: z.coerce.number().int().min(1).max(10).optional(),
-  goalDuration: z.coerce.number().int().min(1).max(300).optional(),
-  heightCm: heightValueSchema.optional().nullable(),
-})
+const profileSchema = z
+  .object({
+    nickname: z.string().trim().min(1).max(30),
+    avatarUrl: z.preprocess(emptyStringToNull, z.string().trim().max(500).optional().nullable()),
+    gender: z.preprocess(emptyStringToNull, z.enum(['male', 'female', 'other']).optional().nullable()),
+    birthday: z.preprocess(
+      emptyStringToNull,
+      z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .nullable(),
+    ),
+    goalPeriod: z.enum(['week', 'month']).optional(),
+    goalMode: z.enum(['count', 'duration', 'both']).optional(),
+    goalCount: z.coerce.number().int().optional(),
+    goalDuration: z.coerce.number().int().optional(),
+    heightCm: heightValueSchema.optional().nullable(),
+  })
+  .superRefine((value, context) => {
+    const period = value.goalPeriod || 'week'
+    const rule = goalRules[period]
+    if (
+      value.goalCount !== undefined &&
+      (value.goalCount < rule.countMin || value.goalCount > rule.countMax)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['goalCount'],
+        message: `goalCount must be between ${rule.countMin} and ${rule.countMax}`,
+      })
+    }
+    if (
+      value.goalDuration !== undefined &&
+      (value.goalDuration < rule.durationMin || value.goalDuration > rule.durationMax)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['goalDuration'],
+        message: `goalDuration must be between ${rule.durationMin} and ${rule.durationMax}`,
+      })
+    }
+  })
 
 function ok<T>(data: T, message = 'ok') {
   return { code: 0, data, message, msg: message }
@@ -312,15 +359,24 @@ function isGoalPeriod(value: unknown): value is GoalPeriod {
 
 function getGoalSettings(user: NonNullable<Awaited<ReturnType<AppDb['user']['findUnique']>>>) {
   const period = isGoalPeriod(user.goalPeriod) ? user.goalPeriod : 'week'
+  const rule = goalRules[period]
   const mode = isGoalMode(user.goalMode) ? user.goalMode : 'count'
-  const countSource = Number(user.goalCount || 1)
-  const durationSource = Number(user.goalDuration || 30)
+  const countSource = Number(user.goalCount || rule.defaultCount)
+  const durationSource = Number(user.goalDuration || rule.defaultDuration)
 
   return {
     period,
     mode,
-    countGoal: clampNumber(Number.isFinite(countSource) ? Math.trunc(countSource) : 1, 1, 10),
-    durationGoal: clampNumber(Number.isFinite(durationSource) ? Math.trunc(durationSource) : 30, 1, 300),
+    countGoal: clampNumber(
+      Number.isFinite(countSource) ? Math.trunc(countSource) : rule.defaultCount,
+      rule.countMin,
+      rule.countMax,
+    ),
+    durationGoal: clampNumber(
+      Number.isFinite(durationSource) ? Math.trunc(durationSource) : rule.defaultDuration,
+      rule.durationMin,
+      rule.durationMax,
+    ),
   }
 }
 
@@ -788,8 +844,8 @@ export async function createApp(options: CreateAppOptions) {
         openid: wxSession.openid,
         goalPeriod: 'week',
         goalMode: 'count',
-        goalCount: 1,
-        goalDuration: 30,
+        goalCount: goalRules.week.defaultCount,
+        goalDuration: goalRules.week.defaultDuration,
         nickname: '运动达人',
       },
     })

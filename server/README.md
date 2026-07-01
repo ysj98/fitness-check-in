@@ -185,9 +185,9 @@ pm2 start ecosystem.config.cjs --env production
 
 - `goalPeriod` 支持 `week`、`month`。
 - `goalMode` 支持 `count`、`duration`、`both`。
-- `goalCount` 范围为 1-10 次。
-- `goalDuration` 范围为 1-300 分钟。
-- 新用户默认为周目标、按次数、1 次、30 分钟。
+- 周目标：`goalCount` 范围为 1-14 次，`goalDuration` 范围为 30-1500 分钟。
+- 月目标：`goalCount` 范围为 1-60 次，`goalDuration` 范围为 100-6000 分钟。
+- 新用户默认为周目标、按次数、4 次、180 分钟；月目标推荐默认值为 20 次、800 分钟。
 
 ### 打卡接口说明
 

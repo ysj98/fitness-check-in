@@ -18,8 +18,8 @@ function createUser(overrides: Partial<IUserInfoRes> = {}): IUserInfoRes {
     birthday: '',
     goalPeriod: 'week',
     goalMode: 'count',
-    goalCount: 1,
-    goalDuration: 30,
+    goalCount: 4,
+    goalDuration: 180,
     heightCm: null,
     targetWeightKg: null,
     weightUnit: 'kg',
@@ -42,8 +42,8 @@ describe('user store', () => {
     expect(store.userInfo.avatar).toBe('/static/images/default-avatar.png')
     expect(store.userInfo.goalPeriod).toBe('week')
     expect(store.userInfo.goalMode).toBe('count')
-    expect(store.userInfo.goalCount).toBe(1)
-    expect(store.userInfo.goalDuration).toBe(30)
+    expect(store.userInfo.goalCount).toBe(4)
+    expect(store.userInfo.goalDuration).toBe(180)
     expect(store.userInfo.weightUnit).toBe('kg')
   })
 

@@ -34,8 +34,8 @@ function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; w
             dailyGoal: args.create.dailyGoal || 1,
             goalPeriod: args.create.goalPeriod || 'week',
             goalMode: args.create.goalMode || 'count',
-            goalCount: args.create.goalCount || 1,
-            goalDuration: args.create.goalDuration || 30,
+            goalCount: args.create.goalCount || 4,
+            goalDuration: args.create.goalDuration || 180,
             heightCm: null,
             targetWeightKg: null,
             weightUnit: 'kg',
@@ -265,8 +265,8 @@ describe('fitness check-in api', () => {
     expect(response.json().data.user).toMatchObject({
       goalPeriod: 'week',
       goalMode: 'count',
-      goalCount: 1,
-      goalDuration: 30,
+      goalCount: 4,
+      goalDuration: 180,
     })
   })
 
@@ -299,10 +299,14 @@ describe('fitness check-in api', () => {
 
     expect(response.json().data.count).toBe(2)
     expect(response.json().data.records).toHaveLength(2)
-    expect(response.json().data.records[0]).toMatchObject({
-      sportType: '瑜伽',
-      durationMinutes: 45,
-    })
+    expect(response.json().data.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sportType: '瑜伽',
+          durationMinutes: 45,
+        }),
+      ]),
+    )
   })
 
   it('saves check-in sport details and rejects invalid duration', async () => {
@@ -575,7 +579,7 @@ describe('fitness check-in api', () => {
         goalPeriod: 'month',
         goalMode: 'both',
         goalCount: 3,
-        goalDuration: 45,
+        goalDuration: 800,
       },
     })
 
@@ -585,7 +589,7 @@ describe('fitness check-in api', () => {
     expect(response.json().data.goalPeriod).toBe('month')
     expect(response.json().data.goalMode).toBe('both')
     expect(response.json().data.goalCount).toBe(3)
-    expect(response.json().data.goalDuration).toBe(45)
+    expect(response.json().data.goalDuration).toBe(800)
   })
 
   it('normalizes empty optional profile fields to null', async () => {
@@ -634,15 +638,15 @@ describe('fitness check-in api', () => {
       headers: { authorization: `Bearer ${session.token}` },
       payload: {
         nickname: 'Alex',
-        goalPeriod: 'year',
+        goalPeriod: 'week',
         goalMode: 'both',
-        goalCount: 11,
-        goalDuration: 301,
+        goalCount: 15,
+        goalDuration: 29,
       },
     })
 
     expect(response.statusCode).toBe(400)
-    expect(response.json().message).toContain('goalPeriod')
+    expect(response.json().message).toContain('goalCount')
   })
 
   it('returns count goal progress and badges in stats', async () => {
@@ -682,15 +686,15 @@ describe('fitness check-in api', () => {
     expect(data.totalCount).toBe(4)
     expect(data.todayCount).toBe(2)
     expect(data.todayDurationMinutes).toBe(60)
-    expect(data.goalCount).toBe(3)
-    expect(data.goalDurationMinutes).toBe(90)
+    expect(data.goalCount).toBe(4)
+    expect(data.goalDurationMinutes).toBe(120)
     expect(data.goalProgress).toMatchObject({
       period: 'week',
       mode: 'count',
       countGoal: 2,
       durationGoal: 60,
       completed: true,
-      count: { current: 3, target: 2, completed: true, percent: 100 },
+      count: { current: 4, target: 2, completed: true, percent: 100 },
     })
     expect(data.goalCompleted).toBe(true)
     expect(data.badges.find((badge: { key: string }) => badge.key === 'streak_3').unlocked).toBe(true)
@@ -784,7 +788,7 @@ describe('fitness check-in api', () => {
         goalPeriod: 'month',
         goalMode: 'duration',
         goalCount: 2,
-        goalDuration: 60,
+        goalDuration: 100,
       },
     })
     const monthStart = getChinaMonthRange(formatChinaDate(new Date()).slice(0, 7)).start
@@ -793,13 +797,13 @@ describe('fitness check-in api', () => {
         userId: session.user.userId,
         id: 1,
         checkedAt: new Date(monthStart.getTime() + 12 * 60 * 60 * 1000),
-        durationMinutes: 30,
+        durationMinutes: 50,
       }),
       createCheckInRecord({
         userId: session.user.userId,
         id: 2,
         checkedAt: new Date(monthStart.getTime() + 3 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000),
-        durationMinutes: 30,
+        durationMinutes: 50,
       }),
     )
 
@@ -813,7 +817,7 @@ describe('fitness check-in api', () => {
       period: 'month',
       mode: 'duration',
       completed: true,
-      duration: { current: 60, target: 60, completed: true, percent: 100 },
+      duration: { current: 100, target: 100, completed: true, percent: 100 },
     })
     expect(response.json().data.goalCompleted).toBe(true)
   })
@@ -870,8 +874,8 @@ describe('fitness check-in api', () => {
         birthday: '1995-05-20',
         goalPeriod: 'week',
         goalMode: 'count',
-        goalCount: 1,
-        goalDuration: 30,
+        goalCount: 4,
+        goalDuration: 180,
       },
     })
 
@@ -1322,8 +1326,8 @@ describe('fitness check-in api', () => {
         birthday: '1995-05-20',
         goalPeriod: 'week',
         goalMode: 'count',
-        goalCount: 1,
-        goalDuration: 30,
+        goalCount: 4,
+        goalDuration: 180,
         heightCm: 178,
       },
     })

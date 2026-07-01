@@ -44,8 +44,26 @@ const goalPeriodOptions = [
   { label: '周目标', value: 'week' as const },
   { label: '月目标', value: 'month' as const },
 ]
-const countGoalOptions = Array.from({ length: 10 }, (_, index) => index + 1)
-const durationGoalOptions = [15, 30, 45, 60, 90]
+const goalRules = {
+  week: {
+    countMin: 1,
+    countMax: 14,
+    durationMin: 30,
+    durationMax: 1500,
+    defaultCount: 4,
+    defaultDuration: 180,
+    durationOptions: [30, 60, 120, 180, 300, 600, 900, 1500],
+  },
+  month: {
+    countMin: 1,
+    countMax: 60,
+    durationMin: 100,
+    durationMax: 6000,
+    defaultCount: 20,
+    defaultDuration: 800,
+    durationOptions: [100, 300, 600, 800, 1200, 2400, 3600, 6000],
+  },
+}
 const themeOptions = [
   { label: '浅色', value: 'light' as const },
   { label: '深色', value: 'dark' as const },
@@ -57,15 +75,15 @@ const form = reactive({
   birthday: '',
   goalPeriod: 'week' as GoalPeriod,
   goalMode: 'count' as GoalMode,
-  goalCount: 1,
-  goalDuration: 30,
+  goalCount: goalRules.week.defaultCount,
+  goalDuration: goalRules.week.defaultDuration,
   heightCm: '',
 })
 const goalDraft = reactive({
   period: 'week' as GoalPeriod,
   mode: 'count' as GoalMode,
-  countGoal: 1,
-  durationOption: 30 as number | 'custom',
+  countGoal: goalRules.week.defaultCount,
+  durationOption: goalRules.week.defaultDuration as number | 'custom',
   customDuration: '',
 })
 
@@ -106,6 +124,14 @@ const categoryAccentMap: Record<AchievementCategory, 'green' | 'orange' | 'blue'
   weight: 'blue',
   profile: 'pink',
 }
+const activeGoalRule = computed(() => goalRules[goalDraft.period])
+const countGoalOptions = computed(() =>
+  Array.from(
+    { length: activeGoalRule.value.countMax - activeGoalRule.value.countMin + 1 },
+    (_, index) => activeGoalRule.value.countMin + index,
+  ),
+)
+const durationGoalOptions = computed(() => activeGoalRule.value.durationOptions)
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 const goalSheetOpen = ref(false)
 
@@ -127,8 +153,9 @@ async function initProfile() {
   form.birthday = userInfo.birthday || ''
   form.goalPeriod = userInfo.goalPeriod || 'week'
   form.goalMode = userInfo.goalMode || 'count'
-  form.goalCount = userInfo.goalCount || 1
-  form.goalDuration = userInfo.goalDuration || 30
+  const rule = goalRules[form.goalPeriod]
+  form.goalCount = userInfo.goalCount || rule.defaultCount
+  form.goalDuration = userInfo.goalDuration || rule.defaultDuration
   form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
   achievements.value = nextAchievements
   profileReady.value = true
@@ -165,9 +192,10 @@ function formatGoalSummary(period: GoalPeriod, mode: GoalMode, countGoal: number
 
 function openGoalSettingsSheet() {
   goalDraft.period = form.goalPeriod
+  const rule = goalRules[goalDraft.period]
   goalDraft.mode = form.goalMode
-  goalDraft.countGoal = form.goalCount
-  goalDraft.durationOption = durationGoalOptions.includes(form.goalDuration) ? form.goalDuration : 'custom'
+  goalDraft.countGoal = Math.min(rule.countMax, Math.max(rule.countMin, form.goalCount))
+  goalDraft.durationOption = rule.durationOptions.includes(form.goalDuration) ? form.goalDuration : 'custom'
   goalDraft.customDuration = goalDraft.durationOption === 'custom' ? String(form.goalDuration) : ''
   goalSheetOpen.value = true
 }
@@ -180,6 +208,10 @@ function closeGoalSettingsSheet() {
 
 function selectGoalPeriod(period: GoalPeriod) {
   goalDraft.period = period
+  const rule = goalRules[period]
+  goalDraft.countGoal = rule.defaultCount
+  goalDraft.durationOption = rule.defaultDuration
+  goalDraft.customDuration = ''
 }
 
 function selectGoalMode(mode: GoalMode) {
@@ -203,20 +235,22 @@ function resolveGoalDuration() {
     return null
   }
   const duration = Number(value)
-  if (duration < 1 || duration > 300) {
-    uni.showToast({ title: '运动时长需为 1-300 分钟', icon: 'none' })
+  const rule = activeGoalRule.value
+  if (duration < rule.durationMin || duration > rule.durationMax) {
+    uni.showToast({ title: `运动时长需为 ${rule.durationMin}-${rule.durationMax} 分钟`, icon: 'none' })
     return null
   }
   return duration
 }
 
 async function saveGoalSettings() {
+  const rule = activeGoalRule.value
   const durationGoal =
     goalDraft.mode === 'duration' || goalDraft.mode === 'both'
       ? resolveGoalDuration()
       : typeof goalDraft.durationOption === 'number'
         ? goalDraft.durationOption
-        : form.goalDuration
+        : rule.defaultDuration
   if (!durationGoal) {
     return
   }
@@ -548,8 +582,8 @@ async function saveProfile() {
               v-model="goalDraft.customDuration"
               class="goal-custom-input numeric"
               type="number"
-              :maxlength="3"
-              placeholder="1-300"
+              :maxlength="4"
+              :placeholder="`${activeGoalRule.durationMin}-${activeGoalRule.durationMax}`"
               placeholder-class="placeholder"
             />
             <text>分钟</text>

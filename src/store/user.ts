@@ -14,8 +14,8 @@ const initialUserInfo: IUserInfoRes = {
   birthday: '',
   goalPeriod: 'week',
   goalMode: 'count',
-  goalCount: 1,
-  goalDuration: 30,
+  goalCount: 4,
+  goalDuration: 180,
   heightCm: null,
   targetWeightKg: null,
   weightUnit: 'kg',
@@ -33,8 +33,8 @@ export const useUserStore = defineStore(
         avatar: value.avatar || value.avatarUrl || defaultAvatar,
         goalPeriod: value.goalPeriod || 'week',
         goalMode: value.goalMode || 'count',
-        goalCount: value.goalCount || 1,
-        goalDuration: value.goalDuration || 30,
+        goalCount: value.goalCount || 4,
+        goalDuration: value.goalDuration || 180,
         weightUnit: value.weightUnit || 'kg',
       }
     }
