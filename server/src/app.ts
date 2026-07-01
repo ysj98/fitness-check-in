@@ -37,10 +37,11 @@ type AchievementBadge = 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND'
 type AchievementMetricKey = 'totalCheckinCount' | 'currentStreak' | 'weightRecordCount' | 'profileCompleted'
 type AchievementIcon = 'checkin' | 'streak' | 'weight' | 'profile'
 type GoalMode = 'count' | 'duration' | 'both'
-type GoalPeriod = 'week' | 'month'
+type GoalPeriod = 'none' | 'week' | 'month'
+type ActiveGoalPeriod = Exclude<GoalPeriod, 'none'>
 
 const goalRules: Record<
-  GoalPeriod,
+  ActiveGoalPeriod,
   { countMin: number; countMax: number; durationMin: number; durationMax: number; defaultCount: number; defaultDuration: number }
 > = {
   week: {
@@ -297,7 +298,7 @@ const profileSchema = z
         .optional()
         .nullable(),
     ),
-    goalPeriod: z.enum(['week', 'month']).optional(),
+    goalPeriod: z.enum(['none', 'week', 'month']).optional(),
     goalMode: z.enum(['count', 'duration', 'both']).optional(),
     goalCount: z.coerce.number().int().optional(),
     goalDuration: z.coerce.number().int().optional(),
@@ -305,6 +306,9 @@ const profileSchema = z
   })
   .superRefine((value, context) => {
     const period = value.goalPeriod || 'week'
+    if (period === 'none') {
+      return
+    }
     const rule = goalRules[period]
     if (
       value.goalCount !== undefined &&
@@ -354,17 +358,27 @@ function isGoalMode(value: unknown): value is GoalMode {
 }
 
 function isGoalPeriod(value: unknown): value is GoalPeriod {
-  return value === 'week' || value === 'month'
+  return value === 'none' || value === 'week' || value === 'month'
 }
 
 function getGoalSettings(user: NonNullable<Awaited<ReturnType<AppDb['user']['findUnique']>>>) {
-  const period = isGoalPeriod(user.goalPeriod) ? user.goalPeriod : 'week'
-  const rule = goalRules[period]
+  const period = isGoalPeriod(user.goalPeriod) ? user.goalPeriod : 'none'
   const mode = isGoalMode(user.goalMode) ? user.goalMode : 'count'
+  if (period === 'none') {
+    return {
+      enabled: false,
+      period,
+      mode,
+      countGoal: goalRules.week.defaultCount,
+      durationGoal: goalRules.week.defaultDuration,
+    }
+  }
+  const rule = goalRules[period]
   const countSource = Number(user.goalCount || rule.defaultCount)
   const durationSource = Number(user.goalDuration || rule.defaultDuration)
 
   return {
+    enabled: true,
     period,
     mode,
     countGoal: clampNumber(
@@ -380,7 +394,7 @@ function getGoalSettings(user: NonNullable<Awaited<ReturnType<AppDb['user']['fin
   }
 }
 
-function getGoalDateRange(period: GoalPeriod) {
+function getGoalDateRange(period: ActiveGoalPeriod) {
   if (period === 'week') {
     return getChinaWeekRange()
   }
@@ -405,6 +419,9 @@ function buildGoalProgress(params: {
   goalDurationMinutes: number
 }) {
   const settings = getGoalSettings(params.user)
+  if (!settings.enabled) {
+    return null
+  }
   const count = buildGoalMetric(params.goalCount, settings.countGoal)
   const duration = buildGoalMetric(params.goalDurationMinutes, settings.durationGoal)
   const completed =
@@ -842,7 +859,7 @@ export async function createApp(options: CreateAppOptions) {
       update: {},
       create: {
         openid: wxSession.openid,
-        goalPeriod: 'week',
+        goalPeriod: 'none',
         goalMode: 'count',
         goalCount: goalRules.week.defaultCount,
         goalDuration: goalRules.week.defaultDuration,
@@ -1238,20 +1255,21 @@ export async function createApp(options: CreateAppOptions) {
       throw error
     }
     const goalSettings = getGoalSettings(user)
-    const goalRange = getGoalDateRange(goalSettings.period)
     const currentStreak = calculateCurrentStreak(allRecords)
     const totalCount = allRecords.length
     const todayRecords = allRecords.filter(
       (record) => record.checkedAt >= todayRange.start && record.checkedAt < todayRange.end,
     )
-    const goalRecords = allRecords.filter(
-      (record) => record.checkedAt >= goalRange.start && record.checkedAt < goalRange.end,
-    )
     const todayCount = todayRecords.length
     const todayDurationMinutes = todayRecords.reduce((total, record) => total + record.durationMinutes, 0)
+    const goalRange = goalSettings.period === 'none' ? null : getGoalDateRange(goalSettings.period)
+    const goalRecords = goalRange
+      ? allRecords.filter((record) => record.checkedAt >= goalRange.start && record.checkedAt < goalRange.end)
+      : []
     const goalCount = goalRecords.length
     const goalDurationMinutes = goalRecords.reduce((total, record) => total + record.durationMinutes, 0)
     const goalProgress = buildGoalProgress({ user, goalCount, goalDurationMinutes })
+    const goalCompleted = goalProgress?.completed ?? false
 
     return ok({
       currentStreak,
@@ -1261,8 +1279,8 @@ export async function createApp(options: CreateAppOptions) {
       goalCount,
       goalDurationMinutes,
       goalProgress,
-      goalCompleted: goalProgress.completed,
-      badges: buildBadges({ currentStreak, totalCount, goalCompleted: goalProgress.completed }),
+      goalCompleted,
+      badges: buildBadges({ currentStreak, totalCount, goalCompleted }),
     })
   })
 

@@ -16,7 +16,7 @@ function createUser(overrides: Partial<IUserInfoRes> = {}): IUserInfoRes {
     avatarUrl: '',
     gender: '',
     birthday: '',
-    goalPeriod: 'week',
+    goalPeriod: 'none',
     goalMode: 'count',
     goalCount: 4,
     goalDuration: 180,
@@ -40,7 +40,7 @@ describe('user store', () => {
     store.setUserInfo(createUser({ goalCount: 0, goalDuration: 0 }))
 
     expect(store.userInfo.avatar).toBe('/static/images/default-avatar.png')
-    expect(store.userInfo.goalPeriod).toBe('week')
+    expect(store.userInfo.goalPeriod).toBe('none')
     expect(store.userInfo.goalMode).toBe('count')
     expect(store.userInfo.goalCount).toBe(4)
     expect(store.userInfo.goalDuration).toBe(180)

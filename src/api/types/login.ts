@@ -1,5 +1,5 @@
 export type WeightUnit = 'kg' | 'jin'
-export type GoalPeriod = 'week' | 'month'
+export type GoalPeriod = 'none' | 'week' | 'month'
 export type GoalMode = 'count' | 'duration' | 'both'
 
 export interface IUserInfoRes {

@@ -1,0 +1,2 @@
+ALTER TABLE `users`
+  MODIFY COLUMN `goalPeriod` VARCHAR(16) NOT NULL DEFAULT 'none';

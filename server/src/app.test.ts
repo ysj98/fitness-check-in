@@ -32,7 +32,7 @@ function createMemoryDb(): AppDb & { users: AppUser[]; checkIns: AppCheckIn[]; w
             gender: null,
             birthday: null,
             dailyGoal: args.create.dailyGoal || 1,
-            goalPeriod: args.create.goalPeriod || 'week',
+            goalPeriod: args.create.goalPeriod || 'none',
             goalMode: args.create.goalMode || 'count',
             goalCount: args.create.goalCount || 4,
             goalDuration: args.create.goalDuration || 180,
@@ -263,7 +263,7 @@ describe('fitness check-in api', () => {
     expect(response.json().data.token).toBeTruthy()
     expect(response.json().data.user.username).toBe('openid-abc')
     expect(response.json().data.user).toMatchObject({
-      goalPeriod: 'week',
+      goalPeriod: 'none',
       goalMode: 'count',
       goalCount: 4,
       goalDuration: 180,
@@ -699,6 +699,31 @@ describe('fitness check-in api', () => {
     expect(data.goalCompleted).toBe(true)
     expect(data.badges.find((badge: { key: string }) => badge.key === 'streak_3').unlocked).toBe(true)
     expect(data.badges.find((badge: { key: string }) => badge.key === 'period_goal').unlocked).toBe(true)
+  })
+
+  it('does not return goal progress when goal is not configured', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({
+      db,
+      exchangeCode: async () => ({ openid: 'openid-1' }),
+    })
+    const session = await login(app)
+
+    db.checkIns.push(checkInAtChinaDay(session.user.userId, 0, 1))
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/checkins/stats',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+    const data = response.json().data
+
+    expect(data.todayCount).toBe(1)
+    expect(data.goalCount).toBe(0)
+    expect(data.goalDurationMinutes).toBe(0)
+    expect(data.goalProgress).toBeNull()
+    expect(data.goalCompleted).toBe(false)
+    expect(data.badges.find((badge: { key: string }) => badge.key === 'period_goal').unlocked).toBe(false)
   })
 
   it('requires both count and duration when goal mode is both', async () => {

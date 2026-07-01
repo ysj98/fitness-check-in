@@ -15,7 +15,7 @@ model User {
   gender         String?
   birthday       String?
   dailyGoal      Int            @default(1)
-  goalPeriod     String         @default("week") @db.VarChar(16)
+  goalPeriod     String         @default("none") @db.VarChar(16)
   goalMode       String         @default("count") @db.VarChar(16)
   goalCount      Int            @default(4)
   goalDuration   Int            @default(180)

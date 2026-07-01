@@ -65,16 +65,7 @@ const emptyStats: CheckInStatsRes = {
   todayDurationMinutes: 0,
   goalCount: 0,
   goalDurationMinutes: 0,
-  goalProgress: {
-    period: 'week',
-    mode: 'count',
-    countGoal: 4,
-    durationGoal: 180,
-    count: { current: 0, target: 4, percent: 0, completed: false },
-    duration: { current: 0, target: 180, percent: 0, completed: false },
-    completed: false,
-    percent: 0,
-  },
+  goalProgress: null,
   goalCompleted: false,
   badges: [],
 }
@@ -169,7 +160,7 @@ const checkInButtonText = computed(() => {
   if (successPulse.value) {
     return '打卡成功'
   }
-  return checkInStats.value.goalCompleted ? '继续打卡' : '立即打卡'
+  return checkInStats.value.goalProgress?.completed ? '继续打卡' : '立即打卡'
 })
 
 const checkInSummaryText = computed(() => {
@@ -178,49 +169,29 @@ const checkInSummaryText = computed(() => {
 
 const targetGoalProgress = computed(() => checkInStats.value.goalProgress)
 
-const targetGoalTitle = computed(() => (targetGoalProgress.value.period === 'month' ? '本月目标' : '本周目标'))
+const targetGoalTitle = computed(() => (targetGoalProgress.value?.period === 'month' ? '本月目标' : '本周目标'))
 
 const targetGoalStatusText = computed(() => {
-  if (targetGoalProgress.value.completed) {
+  const progress = targetGoalProgress.value
+  if (!progress) {
+    return ''
+  }
+  if (progress.completed) {
     return `${targetGoalTitle.value}已达成`
   }
-  if (targetGoalProgress.value.mode === 'count') {
-    return `还差 ${Math.max(targetGoalProgress.value.count.target - targetGoalProgress.value.count.current, 0)} 次`
+  if (progress.mode === 'count') {
+    return `还差 ${Math.max(progress.count.target - progress.count.current, 0)} 次`
   }
-  if (targetGoalProgress.value.mode === 'duration') {
-    return `还差 ${Math.max(targetGoalProgress.value.duration.target - targetGoalProgress.value.duration.current, 0)} 分钟`
+  if (progress.mode === 'duration') {
+    return `还差 ${Math.max(progress.duration.target - progress.duration.current, 0)} 分钟`
   }
-  const countLeft = Math.max(targetGoalProgress.value.count.target - targetGoalProgress.value.count.current, 0)
-  const durationLeft = Math.max(targetGoalProgress.value.duration.target - targetGoalProgress.value.duration.current, 0)
+  const countLeft = Math.max(progress.count.target - progress.count.current, 0)
+  const durationLeft = Math.max(progress.duration.target - progress.duration.current, 0)
   return countLeft > 0 && durationLeft > 0
     ? `还差 ${countLeft} 次 · ${durationLeft} 分钟`
     : countLeft > 0
       ? `还差 ${countLeft} 次`
       : `还差 ${durationLeft} 分钟`
-})
-
-const targetGoalItems = computed(() => {
-  const progress = targetGoalProgress.value
-  const items: Array<{ key: string; label: string; value: string; percent: number; completed: boolean }> = []
-  if (progress.mode === 'count' || progress.mode === 'both') {
-    items.push({
-      key: 'count',
-      label: '打卡次数',
-      value: `${progress.count.current}/${progress.count.target} 次`,
-      percent: progress.count.percent,
-      completed: progress.count.completed,
-    })
-  }
-  if (progress.mode === 'duration' || progress.mode === 'both') {
-    items.push({
-      key: 'duration',
-      label: '运动时长',
-      value: `${progress.duration.current}/${progress.duration.target} 分钟`,
-      percent: progress.duration.percent,
-      completed: progress.duration.completed,
-    })
-  }
-  return items
 })
 
 const todayTotalDuration = computed(() =>
@@ -741,28 +712,12 @@ function formatTime(value: string) {
     <view class="energy-card-shell">
       <app-card accent="green" elevated>
         <view class="energy-card-content" :class="{ pulse: successPulse }">
-          <view class="goal-panel">
+          <view v-if="targetGoalProgress" class="goal-panel">
             <view>
               <text class="goal-caption">{{ targetGoalTitle }}</text>
               <text class="goal-status">{{ targetGoalStatusText }}</text>
             </view>
             <text class="goal-percent numeric">{{ targetGoalProgress.percent }}%</text>
-          </view>
-          <view class="goal-progress-list">
-            <view
-              v-for="item in targetGoalItems"
-              :key="item.key"
-              class="goal-progress-item"
-              :class="{ completed: item.completed }"
-            >
-              <view class="goal-progress-head">
-                <text>{{ item.label }}</text>
-                <text class="numeric">{{ item.value }}</text>
-              </view>
-              <view class="goal-progress-track">
-                <view class="goal-progress-bar" :style="{ width: `${item.percent}%` }" />
-              </view>
-            </view>
           </view>
 
           <view class="checkin-action">
@@ -1204,51 +1159,6 @@ function formatTime(value: string) {
   color: var(--app-green);
   font-size: 42rpx;
   font-weight: 860;
-}
-
-.goal-progress-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14rpx;
-  margin-top: 18rpx;
-}
-
-.goal-progress-item {
-  padding: 18rpx 20rpx;
-  border: 1rpx solid rgba(34, 199, 111, 0.1);
-  border-radius: 22rpx;
-  background: rgba(34, 199, 111, 0.06);
-  box-sizing: border-box;
-}
-
-.goal-progress-item.completed {
-  border-color: rgba(34, 199, 111, 0.22);
-  background: rgba(34, 199, 111, 0.1);
-}
-
-.goal-progress-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-  color: var(--app-label-secondary);
-  font-size: 23rpx;
-  font-weight: 700;
-}
-
-.goal-progress-track {
-  height: 10rpx;
-  margin-top: 14rpx;
-  border-radius: 999rpx;
-  background: rgba(34, 199, 111, 0.12);
-  overflow: hidden;
-}
-
-.goal-progress-bar {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--app-green), var(--app-green-deep));
-  transition: width var(--app-motion-normal) var(--app-ease-out);
 }
 
 .checkin-action {

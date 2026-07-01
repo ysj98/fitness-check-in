@@ -68,7 +68,7 @@ export interface CheckInStatsRes {
   todayDurationMinutes: number
   goalCount: number
   goalDurationMinutes: number
-  goalProgress: GoalProgress
+  goalProgress: GoalProgress | null
   goalCompleted: boolean
   badges: CheckInBadge[]
 }

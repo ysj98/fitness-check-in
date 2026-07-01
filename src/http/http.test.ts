@@ -14,7 +14,7 @@ const loginResult: IAuthLoginRes = {
     avatarUrl: '',
     gender: '',
     birthday: '',
-    goalPeriod: 'week',
+    goalPeriod: 'none',
     goalMode: 'count',
     goalCount: 4,
     goalDuration: 180,

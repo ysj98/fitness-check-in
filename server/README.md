@@ -183,11 +183,11 @@ pm2 start ecosystem.config.cjs --env production
 }
 ```
 
-- `goalPeriod` 支持 `week`、`month`。
+- `goalPeriod` 支持 `none`、`week`、`month`。`none` 表示不设置目标。
 - `goalMode` 支持 `count`、`duration`、`both`。
 - 周目标：`goalCount` 范围为 1-14 次，`goalDuration` 范围为 30-1500 分钟。
 - 月目标：`goalCount` 范围为 1-60 次，`goalDuration` 范围为 100-6000 分钟。
-- 新用户默认为周目标、按次数、4 次、180 分钟；月目标推荐默认值为 20 次、800 分钟。
+- 新用户默认不设置目标；开启周目标时推荐默认值为 4 次、180 分钟，月目标推荐默认值为 20 次、800 分钟。
 
 ### 打卡接口说明
 
@@ -257,7 +257,7 @@ pm2 start ecosystem.config.cjs --env production
 }
 ```
 
-`GET /api/checkins/stats` 返回当前周期目标进度。`both` 模式下，当前周或当前月的次数和时长都达成时 `goalCompleted` 才为 `true`，成就中的“目标达成”也使用该规则：
+`GET /api/checkins/stats` 返回当前周期目标进度。未设置目标时 `goalProgress` 为 `null`；`both` 模式下，当前周或当前月的次数和时长都达成时 `goalCompleted` 才为 `true`，成就中的“目标达成”也使用该规则：
 
 ```json
 {

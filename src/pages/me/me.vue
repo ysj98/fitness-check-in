@@ -41,6 +41,7 @@ const goalModeOptions = [
   { label: '次数+时长', value: 'both' as const },
 ]
 const goalPeriodOptions = [
+  { label: '不设置', value: 'none' as const },
   { label: '周目标', value: 'week' as const },
   { label: '月目标', value: 'month' as const },
 ]
@@ -75,14 +76,14 @@ const form = reactive({
   avatarUrl: '',
   gender: '',
   birthday: '',
-  goalPeriod: 'week' as GoalPeriod,
+  goalPeriod: 'none' as GoalPeriod,
   goalMode: 'count' as GoalMode,
   goalCount: goalRules.week.defaultCount,
   goalDuration: goalRules.week.defaultDuration,
   heightCm: '',
 })
 const goalDraft = reactive({
-  period: 'week' as GoalPeriod,
+  period: 'none' as GoalPeriod,
   mode: 'count' as GoalMode,
   countOption: goalRules.week.defaultCount as number | 'custom',
   countGoal: goalRules.week.defaultCount,
@@ -109,6 +110,9 @@ const goalSummary = computed(() =>
   formatGoalSummary(form.goalPeriod, form.goalMode, form.goalCount, form.goalDuration),
 )
 const draftGoalSummary = computed(() => {
+  if (goalDraft.period === 'none') {
+    return '未设置'
+  }
   const count = getDraftCountGoal()
   const duration =
     typeof goalDraft.durationOption === 'number'
@@ -129,7 +133,12 @@ const categoryAccentMap: Record<AchievementCategory, 'green' | 'orange' | 'blue'
   weight: 'blue',
   profile: 'pink',
 }
-const activeGoalRule = computed(() => goalRules[goalDraft.period])
+function getActiveGoalPeriod(period: GoalPeriod) {
+  return period === 'month' ? 'month' : 'week'
+}
+
+const goalEnabled = computed(() => goalDraft.period !== 'none')
+const activeGoalRule = computed(() => goalRules[getActiveGoalPeriod(goalDraft.period)])
 const countGoalOptions = computed(() => activeGoalRule.value.countOptions)
 const durationGoalOptions = computed(() => activeGoalRule.value.durationOptions)
 let saveTimer: ReturnType<typeof setTimeout> | undefined
@@ -151,9 +160,9 @@ async function initProfile() {
   form.avatarUrl = userInfo.avatarUrl || userInfo.avatar || ''
   form.gender = userInfo.gender || ''
   form.birthday = userInfo.birthday || ''
-  form.goalPeriod = userInfo.goalPeriod || 'week'
+  form.goalPeriod = userInfo.goalPeriod || 'none'
   form.goalMode = userInfo.goalMode || 'count'
-  const rule = goalRules[form.goalPeriod]
+  const rule = goalRules[getActiveGoalPeriod(form.goalPeriod)]
   form.goalCount = userInfo.goalCount || rule.defaultCount
   form.goalDuration = userInfo.goalDuration || rule.defaultDuration
   form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
@@ -180,6 +189,9 @@ function selectTheme(mode: ThemeMode) {
 }
 
 function formatGoalSummary(period: GoalPeriod, mode: GoalMode, countGoal: number, durationGoal: number) {
+  if (period === 'none') {
+    return '未设置'
+  }
   const periodText = period === 'month' ? '月目标' : '周目标'
   if (mode === 'count') {
     return `${periodText} · ${countGoal} 次`
@@ -192,7 +204,7 @@ function formatGoalSummary(period: GoalPeriod, mode: GoalMode, countGoal: number
 
 function openGoalSettingsSheet() {
   goalDraft.period = form.goalPeriod
-  const rule = goalRules[goalDraft.period]
+  const rule = goalRules[getActiveGoalPeriod(goalDraft.period)]
   goalDraft.mode = form.goalMode
   goalDraft.countGoal = Math.min(rule.countMax, Math.max(rule.countMin, form.goalCount))
   goalDraft.countOption = rule.countOptions.includes(goalDraft.countGoal) ? goalDraft.countGoal : 'custom'
@@ -210,6 +222,9 @@ function closeGoalSettingsSheet() {
 
 function selectGoalPeriod(period: GoalPeriod) {
   goalDraft.period = period
+  if (period === 'none') {
+    return
+  }
   const rule = goalRules[period]
   goalDraft.countOption = rule.defaultCount
   goalDraft.countGoal = rule.defaultCount
@@ -283,6 +298,13 @@ function resolveGoalDuration() {
 }
 
 async function saveGoalSettings() {
+  if (goalDraft.period === 'none') {
+    form.goalPeriod = 'none'
+    goalSheetOpen.value = false
+    await saveProfile()
+    uni.showToast({ title: '目标设置已关闭', icon: 'success' })
+    return
+  }
   const rule = activeGoalRule.value
   const countGoal =
     goalDraft.mode === 'count' || goalDraft.mode === 'both'
@@ -581,12 +603,12 @@ async function saveProfile() {
               <app-segmented-control :model-value="goalDraft.period" :options="goalPeriodOptions" @change="selectGoalPeriod" />
             </view>
 
-            <view class="goal-setting-card">
+            <view v-if="goalEnabled" class="goal-setting-card">
               <text class="goal-setting-title">目标模式</text>
               <app-segmented-control :model-value="goalDraft.mode" :options="goalModeOptions" @change="selectGoalMode" />
             </view>
 
-            <view v-if="goalDraft.mode === 'count' || goalDraft.mode === 'both'" class="goal-setting-card">
+            <view v-if="goalEnabled && (goalDraft.mode === 'count' || goalDraft.mode === 'both')" class="goal-setting-card">
               <text class="goal-setting-title">打卡次数</text>
               <view class="goal-option-grid option-grid cols-5 count-grid">
                 <button
@@ -621,7 +643,7 @@ async function saveProfile() {
               </view>
             </view>
 
-            <view v-if="goalDraft.mode === 'duration' || goalDraft.mode === 'both'" class="goal-setting-card">
+            <view v-if="goalEnabled && (goalDraft.mode === 'duration' || goalDraft.mode === 'both')" class="goal-setting-card">
               <text class="goal-setting-title">运动时长</text>
               <view class="goal-option-grid option-grid cols-3 duration-grid">
                 <button
