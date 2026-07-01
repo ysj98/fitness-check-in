@@ -52,6 +52,7 @@ const goalRules = {
     durationMax: 1500,
     defaultCount: 4,
     defaultDuration: 180,
+    countOptions: [1, 2, 3, 4, 5, 7, 10, 14],
     durationOptions: [30, 60, 120, 180, 300, 600, 900, 1500],
   },
   month: {
@@ -61,6 +62,7 @@ const goalRules = {
     durationMax: 6000,
     defaultCount: 20,
     defaultDuration: 800,
+    countOptions: [4, 8, 12, 16, 20, 30, 45, 60],
     durationOptions: [100, 300, 600, 800, 1200, 2400, 3600, 6000],
   },
 }
@@ -82,7 +84,9 @@ const form = reactive({
 const goalDraft = reactive({
   period: 'week' as GoalPeriod,
   mode: 'count' as GoalMode,
+  countOption: goalRules.week.defaultCount as number | 'custom',
   countGoal: goalRules.week.defaultCount,
+  customCount: '',
   durationOption: goalRules.week.defaultDuration as number | 'custom',
   customDuration: '',
 })
@@ -105,11 +109,12 @@ const goalSummary = computed(() =>
   formatGoalSummary(form.goalPeriod, form.goalMode, form.goalCount, form.goalDuration),
 )
 const draftGoalSummary = computed(() => {
+  const count = getDraftCountGoal()
   const duration =
     typeof goalDraft.durationOption === 'number'
       ? goalDraft.durationOption
       : Number(goalDraft.customDuration.trim()) || form.goalDuration
-  return formatGoalSummary(goalDraft.period, goalDraft.mode, goalDraft.countGoal, duration)
+  return formatGoalSummary(goalDraft.period, goalDraft.mode, count, duration)
 })
 const badgeAccentMap: Record<AchievementBadge, 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond'> = {
   BRONZE: 'bronze',
@@ -125,12 +130,7 @@ const categoryAccentMap: Record<AchievementCategory, 'green' | 'orange' | 'blue'
   profile: 'pink',
 }
 const activeGoalRule = computed(() => goalRules[goalDraft.period])
-const countGoalOptions = computed(() =>
-  Array.from(
-    { length: activeGoalRule.value.countMax - activeGoalRule.value.countMin + 1 },
-    (_, index) => activeGoalRule.value.countMin + index,
-  ),
-)
+const countGoalOptions = computed(() => activeGoalRule.value.countOptions)
 const durationGoalOptions = computed(() => activeGoalRule.value.durationOptions)
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 const goalSheetOpen = ref(false)
@@ -195,6 +195,8 @@ function openGoalSettingsSheet() {
   const rule = goalRules[goalDraft.period]
   goalDraft.mode = form.goalMode
   goalDraft.countGoal = Math.min(rule.countMax, Math.max(rule.countMin, form.goalCount))
+  goalDraft.countOption = rule.countOptions.includes(goalDraft.countGoal) ? goalDraft.countGoal : 'custom'
+  goalDraft.customCount = goalDraft.countOption === 'custom' ? String(goalDraft.countGoal) : ''
   goalDraft.durationOption = rule.durationOptions.includes(form.goalDuration) ? form.goalDuration : 'custom'
   goalDraft.customDuration = goalDraft.durationOption === 'custom' ? String(form.goalDuration) : ''
   goalSheetOpen.value = true
@@ -209,7 +211,9 @@ function closeGoalSettingsSheet() {
 function selectGoalPeriod(period: GoalPeriod) {
   goalDraft.period = period
   const rule = goalRules[period]
+  goalDraft.countOption = rule.defaultCount
   goalDraft.countGoal = rule.defaultCount
+  goalDraft.customCount = ''
   goalDraft.durationOption = rule.defaultDuration
   goalDraft.customDuration = ''
 }
@@ -218,11 +222,46 @@ function selectGoalMode(mode: GoalMode) {
   goalDraft.mode = mode
 }
 
+function selectGoalCountOption(value: number | 'custom') {
+  goalDraft.countOption = value
+  if (value === 'custom') {
+    goalDraft.customCount = ''
+    return
+  }
+  goalDraft.countGoal = value
+  goalDraft.customCount = ''
+}
+
 function selectGoalDurationOption(value: number | 'custom') {
   goalDraft.durationOption = value
   if (value !== 'custom') {
     goalDraft.customDuration = ''
   }
+}
+
+function getDraftCountGoal() {
+  if (typeof goalDraft.countOption === 'number') {
+    return goalDraft.countOption
+  }
+  return Number(goalDraft.customCount.trim()) || form.goalCount
+}
+
+function resolveGoalCount() {
+  if (typeof goalDraft.countOption === 'number') {
+    return goalDraft.countOption
+  }
+  const value = goalDraft.customCount.trim()
+  if (!value || !/^\d+$/.test(value)) {
+    uni.showToast({ title: '请输入有效打卡次数', icon: 'none' })
+    return null
+  }
+  const count = Number(value)
+  const rule = activeGoalRule.value
+  if (count < rule.countMin || count > rule.countMax) {
+    uni.showToast({ title: `打卡次数需为 ${rule.countMin}-${rule.countMax} 次`, icon: 'none' })
+    return null
+  }
+  return count
 }
 
 function resolveGoalDuration() {
@@ -245,18 +284,24 @@ function resolveGoalDuration() {
 
 async function saveGoalSettings() {
   const rule = activeGoalRule.value
+  const countGoal =
+    goalDraft.mode === 'count' || goalDraft.mode === 'both'
+      ? resolveGoalCount()
+      : typeof goalDraft.countOption === 'number'
+        ? goalDraft.countOption
+        : rule.defaultCount
   const durationGoal =
     goalDraft.mode === 'duration' || goalDraft.mode === 'both'
       ? resolveGoalDuration()
       : typeof goalDraft.durationOption === 'number'
         ? goalDraft.durationOption
         : rule.defaultDuration
-  if (!durationGoal) {
+  if (!countGoal || !durationGoal) {
     return
   }
   form.goalPeriod = goalDraft.period
   form.goalMode = goalDraft.mode
-  form.goalCount = goalDraft.countGoal
+  form.goalCount = countGoal
   form.goalDuration = durationGoal
   goalSheetOpen.value = false
   await saveProfile()
@@ -524,71 +569,94 @@ async function saveProfile() {
       @close="closeGoalSettingsSheet"
     >
       <view class="goal-settings-sheet">
-        <view class="goal-settings-summary">
-          <text>当前设置</text>
-          <text class="numeric">{{ draftGoalSummary }}</text>
-        </view>
+        <scroll-view class="goal-settings-scroll" scroll-y enhanced show-scrollbar>
+          <view class="goal-settings-content">
+            <view class="goal-settings-summary">
+              <text>当前设置</text>
+              <text class="numeric">{{ draftGoalSummary }}</text>
+            </view>
 
-        <view class="goal-setting-card">
-          <text class="goal-setting-title">目标周期</text>
-          <app-segmented-control :model-value="goalDraft.period" :options="goalPeriodOptions" @change="selectGoalPeriod" />
-        </view>
+            <view class="goal-setting-card">
+              <text class="goal-setting-title">目标周期</text>
+              <app-segmented-control :model-value="goalDraft.period" :options="goalPeriodOptions" @change="selectGoalPeriod" />
+            </view>
 
-        <view class="goal-setting-card">
-          <text class="goal-setting-title">目标模式</text>
-          <app-segmented-control :model-value="goalDraft.mode" :options="goalModeOptions" @change="selectGoalMode" />
-        </view>
+            <view class="goal-setting-card">
+              <text class="goal-setting-title">目标模式</text>
+              <app-segmented-control :model-value="goalDraft.mode" :options="goalModeOptions" @change="selectGoalMode" />
+            </view>
 
-        <view v-if="goalDraft.mode === 'count' || goalDraft.mode === 'both'" class="goal-setting-card">
-          <text class="goal-setting-title">打卡次数</text>
-          <view class="goal-option-grid option-grid cols-5 count-grid">
-            <button
-              v-for="count in countGoalOptions"
-              :key="count"
-              class="goal-option option-pill"
-              :class="{ active: goalDraft.countGoal === count }"
-              hover-class="option-pill-pressed"
-              @click.stop="goalDraft.countGoal = count"
-            >
-              {{ count }} 次
-            </button>
+            <view v-if="goalDraft.mode === 'count' || goalDraft.mode === 'both'" class="goal-setting-card">
+              <text class="goal-setting-title">打卡次数</text>
+              <view class="goal-option-grid option-grid cols-5 count-grid">
+                <button
+                  v-for="count in countGoalOptions"
+                  :key="count"
+                  class="goal-option option-pill"
+                  :class="{ active: goalDraft.countOption === count }"
+                  hover-class="option-pill-pressed"
+                  @click.stop="selectGoalCountOption(count)"
+                >
+                  {{ count }} 次
+                </button>
+                <button
+                  class="goal-option option-pill"
+                  :class="{ active: goalDraft.countOption === 'custom' }"
+                  hover-class="option-pill-pressed"
+                  @click.stop="selectGoalCountOption('custom')"
+                >
+                  自定义
+                </button>
+              </view>
+              <view v-if="goalDraft.countOption === 'custom'" class="goal-custom-row">
+                <input
+                  v-model="goalDraft.customCount"
+                  class="goal-custom-input numeric"
+                  type="number"
+                  :maxlength="2"
+                  :placeholder="`${activeGoalRule.countMin}-${activeGoalRule.countMax}`"
+                  placeholder-class="placeholder"
+                />
+                <text>次</text>
+              </view>
+            </view>
+
+            <view v-if="goalDraft.mode === 'duration' || goalDraft.mode === 'both'" class="goal-setting-card">
+              <text class="goal-setting-title">运动时长</text>
+              <view class="goal-option-grid option-grid cols-3 duration-grid">
+                <button
+                  v-for="minutes in durationGoalOptions"
+                  :key="minutes"
+                  class="goal-option option-pill"
+                  :class="{ active: goalDraft.durationOption === minutes }"
+                  hover-class="option-pill-pressed"
+                  @click.stop="selectGoalDurationOption(minutes)"
+                >
+                  {{ minutes }} 分钟
+                </button>
+                <button
+                  class="goal-option option-pill"
+                  :class="{ active: goalDraft.durationOption === 'custom' }"
+                  hover-class="option-pill-pressed"
+                  @click.stop="selectGoalDurationOption('custom')"
+                >
+                  自定义
+                </button>
+              </view>
+              <view v-if="goalDraft.durationOption === 'custom'" class="goal-custom-row">
+                <input
+                  v-model="goalDraft.customDuration"
+                  class="goal-custom-input numeric"
+                  type="number"
+                  :maxlength="4"
+                  :placeholder="`${activeGoalRule.durationMin}-${activeGoalRule.durationMax}`"
+                  placeholder-class="placeholder"
+                />
+                <text>分钟</text>
+              </view>
+            </view>
           </view>
-        </view>
-
-        <view v-if="goalDraft.mode === 'duration' || goalDraft.mode === 'both'" class="goal-setting-card">
-          <text class="goal-setting-title">运动时长</text>
-          <view class="goal-option-grid option-grid cols-3 duration-grid">
-            <button
-              v-for="minutes in durationGoalOptions"
-              :key="minutes"
-              class="goal-option option-pill"
-              :class="{ active: goalDraft.durationOption === minutes }"
-              hover-class="option-pill-pressed"
-              @click.stop="selectGoalDurationOption(minutes)"
-            >
-              {{ minutes }} 分钟
-            </button>
-            <button
-              class="goal-option option-pill"
-              :class="{ active: goalDraft.durationOption === 'custom' }"
-              hover-class="option-pill-pressed"
-              @click.stop="selectGoalDurationOption('custom')"
-            >
-              自定义
-            </button>
-          </view>
-          <view v-if="goalDraft.durationOption === 'custom'" class="goal-custom-row">
-            <input
-              v-model="goalDraft.customDuration"
-              class="goal-custom-input numeric"
-              type="number"
-              :maxlength="4"
-              :placeholder="`${activeGoalRule.durationMin}-${activeGoalRule.durationMax}`"
-              placeholder-class="placeholder"
-            />
-            <text>分钟</text>
-          </view>
-        </view>
+        </scroll-view>
 
         <view class="goal-action-bar">
           <button class="goal-action secondary" hover-class="goal-action-pressed" @click.stop="closeGoalSettingsSheet">
@@ -889,7 +957,20 @@ async function saveProfile() {
 }
 
 .goal-settings-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding-top: 10rpx;
+}
+
+.goal-settings-scroll {
+  height: calc(72vh - 230rpx - env(safe-area-inset-bottom));
+  max-height: 860rpx;
+  min-height: 420rpx;
+}
+
+.goal-settings-content {
+  padding-bottom: 14rpx;
 }
 
 .goal-settings-summary {
@@ -963,14 +1044,14 @@ async function saveProfile() {
 }
 
 .goal-action-bar {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 2;
   display: grid;
   grid-template-columns: 1fr 1.45fr;
   gap: 16rpx;
-  padding: 14rpx 0 2rpx;
-  background: linear-gradient(180deg, rgba(247, 251, 248, 0), #f7fbf8 24rpx);
+  flex: 0 0 auto;
+  padding: 16rpx 0 2rpx;
+  background: #f7fbf8;
 }
 
 .goal-action {
