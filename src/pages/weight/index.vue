@@ -10,6 +10,8 @@ import {
   updateWeight,
   updateWeightSettings,
 } from '@/api/weights'
+import AchievementUnlockSheet from '@/components/achievement-unlock-sheet/achievement-unlock-sheet.vue'
+import { useAchievementUnlockFeedback } from '@/composables/useAchievementUnlockFeedback'
 import { useThemeStore, useTokenStore, useUserStore } from '@/store'
 import { triggerSuccessHaptic } from '@/utils/haptics'
 
@@ -41,6 +43,12 @@ const emptyStats: WeightStatsRes = {
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const {
+  activeUnlockedAchievement,
+  closeAchievementUnlock,
+  syncAchievementUnlocks,
+  unlockedAchievementQueue,
+} = useAchievementUnlockFeedback()
 const loading = ref(false)
 const loadFailed = ref(false)
 const savingRecord = ref(false)
@@ -232,7 +240,11 @@ async function loadPage() {
   loadFailed.value = false
   try {
     await ensureLogin()
-    const [list, nextStats] = await Promise.all([getWeights(1, pageSize), getWeightStats(selectedDays.value)])
+    const [list, nextStats] = await Promise.all([
+      getWeights(1, pageSize),
+      getWeightStats(selectedDays.value),
+      syncAchievementUnlocks(false),
+    ])
     records.value = list.items
     total.value = list.total
     page.value = 1
@@ -337,9 +349,12 @@ async function saveRecord() {
     }
     recordModalVisible.value = false
     await refreshWeightData()
+    const unlockedCount = await syncAchievementUnlocks(true)
     successPulse.value = true
     triggerSuccessHaptic()
-    uni.showToast({ title: editingRecord.value ? '记录已更新' : '体重已记录', icon: 'success' })
+    if (unlockedCount === 0) {
+      uni.showToast({ title: editingRecord.value ? '记录已更新' : '体重已记录', icon: 'success' })
+    }
     setTimeout(() => {
       successPulse.value = false
     }, 360)
@@ -423,7 +438,10 @@ async function saveSettings() {
     userStore.setUserInfo(userInfo)
     settingsModalVisible.value = false
     await refreshWeightData()
-    uni.showToast({ title: '设置已保存', icon: 'success' })
+    const unlockedCount = await syncAchievementUnlocks(true)
+    if (unlockedCount === 0) {
+      uni.showToast({ title: '设置已保存', icon: 'success' })
+    }
   } finally {
     savingSettings.value = false
   }
@@ -684,6 +702,13 @@ function getChinaDateTimeParts(date: Date) {
         </view>
       </view>
     </app-sheet>
+
+    <achievement-unlock-sheet
+      v-if="activeUnlockedAchievement"
+      :achievement="activeUnlockedAchievement"
+      :remaining-count="Math.max(unlockedAchievementQueue.length - 1, 0)"
+      @close="closeAchievementUnlock"
+    />
   </view>
 </template>
 

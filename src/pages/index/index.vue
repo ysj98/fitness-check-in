@@ -9,6 +9,8 @@ import {
   getRecentCheckIns,
   getTodayCheckIns,
 } from '@/api/checkins'
+import AchievementUnlockSheet from '@/components/achievement-unlock-sheet/achievement-unlock-sheet.vue'
+import { useAchievementUnlockFeedback } from '@/composables/useAchievementUnlockFeedback'
 import { useTokenStore } from '@/store'
 import { triggerSuccessHaptic } from '@/utils/haptics'
 
@@ -71,6 +73,12 @@ const emptyStats: CheckInStatsRes = {
 }
 
 const tokenStore = useTokenStore()
+const {
+  activeUnlockedAchievement,
+  closeAchievementUnlock,
+  syncAchievementUnlocks,
+  unlockedAchievementQueue,
+} = useAchievementUnlockFeedback()
 const loading = ref(false)
 const checking = ref(false)
 const loginReady = ref(false)
@@ -297,6 +305,7 @@ onLoad(() => {
 onShow(() => {
   if (loginReady.value) {
     loadDashboard()
+    syncAchievementUnlocks(false)
   }
 })
 
@@ -304,7 +313,7 @@ async function initPage() {
   loading.value = true
   try {
     await ensureLogin()
-    await loadDashboard()
+    await Promise.all([loadDashboard(), syncAchievementUnlocks(false)])
   } catch {
     uni.showToast({ title: '数据加载失败，请重试', icon: 'none' })
   } finally {
@@ -480,11 +489,14 @@ async function handleConfirmCheckIn() {
     successPulse.value = true
     checkInSheetOpen.value = false
     await loadDashboard()
+    const unlockedCount = await syncAchievementUnlocks(true)
     triggerSuccessHaptic()
-    uni.showToast({
-      title: checkInStats.value.goalCompleted ? '目标达成' : '打卡成功',
-      icon: 'success',
-    })
+    if (unlockedCount === 0) {
+      uni.showToast({
+        title: checkInStats.value.goalCompleted ? '目标达成' : '打卡成功',
+        icon: 'success',
+      })
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : '打卡失败，请重试'
     uni.showToast({ title: message, icon: 'none' })
@@ -602,8 +614,11 @@ async function handleConfirmBackfill() {
     selectedMonth.value = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
     backfillSheetOpen.value = false
     await loadDashboard()
+    const unlockedCount = await syncAchievementUnlocks(true)
     triggerSuccessHaptic()
-    uni.showToast({ title: '补签成功', icon: 'success' })
+    if (unlockedCount === 0) {
+      uni.showToast({ title: '补签成功', icon: 'success' })
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : '补签失败，请重试'
     uni.showToast({ title: message, icon: 'none' })
@@ -1068,6 +1083,13 @@ function formatTime(value: string) {
         </view>
       </view>
     </app-sheet>
+
+    <achievement-unlock-sheet
+      v-if="activeUnlockedAchievement"
+      :achievement="activeUnlockedAchievement"
+      :remaining-count="Math.max(unlockedAchievementQueue.length - 1, 0)"
+      @close="closeAchievementUnlock"
+    />
   </view>
 </template>
 

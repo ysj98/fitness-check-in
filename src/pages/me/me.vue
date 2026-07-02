@@ -4,6 +4,8 @@ import type { GoalMode, GoalPeriod } from '@/api/types/login'
 import type { ThemeMode } from '@/store'
 import { getAchievements } from '@/api/achievements'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
+import AchievementUnlockSheet from '@/components/achievement-unlock-sheet/achievement-unlock-sheet.vue'
+import { useAchievementUnlockFeedback } from '@/composables/useAchievementUnlockFeedback'
 import { useThemeStore, useTokenStore, useUserStore } from '@/store'
 import {
   filterAchievementSeries,
@@ -22,6 +24,12 @@ definePage({
 const tokenStore = useTokenStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+const {
+  activeUnlockedAchievement,
+  closeAchievementUnlock,
+  syncAchievementUnlocks,
+  unlockedAchievementQueue,
+} = useAchievementUnlockFeedback()
 const saving = ref(false)
 const profileReady = ref(false)
 const uploadingAvatar = ref(false)
@@ -167,6 +175,7 @@ async function initProfile() {
   form.goalDuration = userInfo.goalDuration || rule.defaultDuration
   form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
   achievements.value = nextAchievements
+  await syncAchievementUnlocks(false, nextAchievements)
   profileReady.value = true
 }
 
@@ -301,8 +310,10 @@ async function saveGoalSettings() {
   if (goalDraft.period === 'none') {
     form.goalPeriod = 'none'
     goalSheetOpen.value = false
-    await saveProfile()
-    uni.showToast({ title: '目标设置已关闭', icon: 'success' })
+    const unlockedCount = await saveProfile()
+    if (unlockedCount === 0) {
+      uni.showToast({ title: '目标设置已关闭', icon: 'success' })
+    }
     return
   }
   const rule = activeGoalRule.value
@@ -326,8 +337,10 @@ async function saveGoalSettings() {
   form.goalCount = countGoal
   form.goalDuration = durationGoal
   goalSheetOpen.value = false
-  await saveProfile()
-  uni.showToast({ title: '目标设置已更新', icon: 'success' })
+  const unlockedCount = await saveProfile()
+  if (unlockedCount === 0) {
+    uni.showToast({ title: '目标设置已更新', icon: 'success' })
+  }
 }
 
 function selectAchievementCategory(category: AchievementCategory) {
@@ -357,8 +370,10 @@ function getSeriesAccent(category: AchievementCategory) {
   return categoryAccentMap[category]
 }
 
-async function refreshAchievements() {
-  achievements.value = await getAchievements()
+async function refreshAchievements(shouldNotify = false) {
+  const nextAchievements = await getAchievements()
+  achievements.value = nextAchievements
+  return syncAchievementUnlocks(shouldNotify, nextAchievements)
 }
 
 function scheduleProfileSave() {
@@ -385,11 +400,13 @@ async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
     const res = await uploadUserAvatar(avatarUrl)
     form.avatarUrl = res.avatarUrl
     avatarTempUrl.value = ''
-    await saveProfile()
-    uni.showToast({
-      title: '头像已更新',
-      icon: 'success',
-    })
+    const unlockedCount = await saveProfile()
+    if (unlockedCount === 0) {
+      uni.showToast({
+        title: '头像已更新',
+        icon: 'success',
+      })
+    }
   } finally {
     uploadingAvatar.value = false
   }
@@ -397,14 +414,14 @@ async function handleChooseAvatar(event: { detail: { avatarUrl?: string } }) {
 
 async function saveProfile() {
   if (!profileReady.value || saving.value) {
-    return
+    return 0
   }
   if (!form.nickname.trim()) {
     uni.showToast({
       title: '请输入昵称',
       icon: 'none',
     })
-    return
+    return 0
   }
 
   const heightCm = form.heightCm === '' ? null : Number(form.heightCm)
@@ -413,7 +430,7 @@ async function saveProfile() {
       title: '请输入 100-250 cm 的身高',
       icon: 'none',
     })
-    return
+    return 0
   }
 
   saving.value = true
@@ -430,8 +447,9 @@ async function saveProfile() {
       heightCm,
     })
     userStore.setUserInfo(userInfo)
-    await refreshAchievements()
+    const unlockedCount = await refreshAchievements(true)
     triggerSuccessHaptic()
+    return unlockedCount
   } finally {
     saving.value = false
   }
@@ -752,6 +770,13 @@ async function saveProfile() {
         </view>
       </view>
     </app-sheet>
+
+    <achievement-unlock-sheet
+      v-if="activeUnlockedAchievement"
+      :achievement="activeUnlockedAchievement"
+      :remaining-count="Math.max(unlockedAchievementQueue.length - 1, 0)"
+      @close="closeAchievementUnlock"
+    />
   </view>
 </template>
 
