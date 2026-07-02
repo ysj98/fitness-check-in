@@ -162,6 +162,7 @@ pm2 start ecosystem.config.cjs --env production
 - `GET /api/checkins/month?month=YYYY-MM`
 - `DELETE /api/checkins/:id`
 - `GET /api/achievements`
+- `GET /api/reports/month?month=YYYY-MM`
 - `GET /api/weights?page=1&pageSize=20`
 - `GET /api/weights/stats?days=7|30|90`
 - `POST /api/weights`
@@ -287,6 +288,29 @@ pm2 start ecosystem.config.cjs --env production
 - 个人资料
 
 每个系列包含当前冲刺阶段、全部阶段详情、已完成阶段数和总阶段数。总进度按 `已完成阶段数 / 全部阶段数` 计算，阶段展示进度会限制在目标值以内，避免出现 `30/10` 这类超过目标值的展示。
+
+### 月报接口说明
+
+`GET /api/reports/month?month=YYYY-MM` 按中国自然月汇总打卡天数、打卡次数、运动时长和体重变化：
+
+```json
+{
+  "month": "2026-06",
+  "checkin": {
+    "days": 8,
+    "count": 12,
+    "durationMinutes": 360,
+    "averageDurationMinutes": 45
+  },
+  "weight": {
+    "recordCount": 2,
+    "startWeightKg": 70,
+    "endWeightKg": 69.5,
+    "changeKg": -0.5,
+    "weightUnit": "kg"
+  }
+}
+```
 
 ## 数据库
 

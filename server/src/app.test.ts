@@ -1373,4 +1373,123 @@ describe('fitness check-in api', () => {
       },
     })
   })
+
+  it('requires login for monthly report', async () => {
+    const app = await createApp({ db: createMemoryDb(), exchangeCode: async (code) => ({ openid: code }) })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports/month?month=2026-06',
+    })
+
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('returns empty monthly report for a month without records', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({ db, exchangeCode: async (code) => ({ openid: code }) })
+    const session = await login(app)
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports/month?month=2026-06',
+      headers: { authorization: `Bearer ${session.token}` },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().data).toMatchObject({
+      month: '2026-06',
+      checkin: {
+        days: 0,
+        count: 0,
+        durationMinutes: 0,
+        averageDurationMinutes: 0,
+      },
+      weight: {
+        recordCount: 0,
+        startWeightKg: null,
+        endWeightKg: null,
+        changeKg: null,
+        weightUnit: 'kg',
+      },
+    })
+  })
+
+  it('summarizes monthly check-ins, duration and weight change', async () => {
+    const db = createMemoryDb()
+    const app = await createApp({ db, exchangeCode: async (code) => ({ openid: code }) })
+    const session = await login(app)
+    const range = getChinaMonthRange('2026-06')
+    const authorization = { authorization: `Bearer ${session.token}` }
+
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/user/weight-settings',
+      headers: authorization,
+      payload: { heightCm: 173, targetWeightKg: 68, weightUnit: 'jin' },
+    })
+    db.checkIns.push(
+      createCheckInRecord({
+        id: 1,
+        userId: session.user.userId,
+        checkedAt: new Date(range.start.getTime() + 12 * 60 * 60 * 1000),
+        sportType: '跑步',
+        durationMinutes: 30,
+      }),
+      createCheckInRecord({
+        id: 2,
+        userId: session.user.userId,
+        checkedAt: new Date(range.start.getTime() + 14 * 60 * 60 * 1000),
+        sportType: '健身',
+        durationMinutes: 45,
+      }),
+      createCheckInRecord({
+        id: 3,
+        userId: session.user.userId,
+        checkedAt: new Date(range.start.getTime() + 2 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000),
+        sportType: '瑜伽',
+        durationMinutes: 60,
+      }),
+    )
+    db.weightRecords.push(
+      {
+        id: 1,
+        userId: session.user.userId,
+        weightKg: 70.2,
+        measuredAt: new Date(range.start.getTime() + 8 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+      {
+        id: 2,
+        userId: session.user.userId,
+        weightKg: 69.4,
+        measuredAt: new Date(range.start.getTime() + 20 * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000),
+        createdAt: new Date(),
+      },
+    )
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/reports/month?month=2026-06',
+      headers: authorization,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json().data).toMatchObject({
+      month: '2026-06',
+      checkin: {
+        days: 2,
+        count: 3,
+        durationMinutes: 135,
+        averageDurationMinutes: 68,
+      },
+      weight: {
+        recordCount: 2,
+        startWeightKg: 70.2,
+        endWeightKg: 69.4,
+        changeKg: -0.8,
+        weightUnit: 'jin',
+      },
+    })
+  })
 })

@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify'
-import type { AppCheckIn, AppDb, WxSession } from './types.js'
+import type { AppCheckIn, AppDb, AppWeightRecord, WxSession } from './types.js'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -548,6 +548,40 @@ function serializeWeightRecord(
   }
 }
 
+function buildMonthlyReport(params: {
+  month: string
+  checkIns: AppCheckIn[]
+  weightRecords: AppWeightRecord[]
+  weightUnit: string
+}) {
+  const checkInDays = new Set(params.checkIns.map((record) => formatChinaDate(record.checkedAt))).size
+  const checkInCount = params.checkIns.length
+  const durationMinutes = params.checkIns.reduce((total, record) => total + record.durationMinutes, 0)
+  const averageDurationMinutes = checkInDays > 0 ? Math.round(durationMinutes / checkInDays) : 0
+  const firstWeight = params.weightRecords[0] || null
+  const lastWeight = params.weightRecords[params.weightRecords.length - 1] || null
+  const startWeightKg = firstWeight ? Number(firstWeight.weightKg) : null
+  const endWeightKg = lastWeight ? Number(lastWeight.weightKg) : null
+  const changeKg = startWeightKg !== null && endWeightKg !== null ? round(endWeightKg - startWeightKg) : null
+
+  return {
+    month: params.month,
+    checkin: {
+      days: checkInDays,
+      count: checkInCount,
+      durationMinutes,
+      averageDurationMinutes,
+    },
+    weight: {
+      recordCount: params.weightRecords.length,
+      startWeightKg,
+      endWeightKg,
+      changeKg,
+      weightUnit: params.weightUnit || 'kg',
+    },
+  }
+}
+
 function buildBadges(params: { currentStreak: number; totalCount: number; goalCompleted: boolean }) {
   const { currentStreak, totalCount, goalCompleted } = params
 
@@ -949,7 +983,8 @@ export async function createApp(options: CreateAppOptions) {
     if (
       request.routeOptions.url?.startsWith('/api/checkins') ||
       request.routeOptions.url?.startsWith('/api/weights') ||
-      request.routeOptions.url?.startsWith('/api/achievements')
+      request.routeOptions.url?.startsWith('/api/achievements') ||
+      request.routeOptions.url?.startsWith('/api/reports')
     ) {
       await requireAuth(request)
     }
@@ -971,6 +1006,42 @@ export async function createApp(options: CreateAppOptions) {
     }
 
     return ok(buildAchievements({ user, checkIns, weightCount }))
+  })
+
+  app.get('/api/reports/month', async (request) => {
+    const query = monthQuerySchema.parse(request.query)
+    const { start, end } = getChinaMonthRange(query.month)
+    const [user, checkIns, weightRecords] = await Promise.all([
+      app.db.user.findUnique({ where: { id: request.user.userId } }),
+      app.db.checkIn.findMany({
+        where: {
+          userId: request.user.userId,
+          checkedAt: { gte: start, lt: end },
+        },
+        orderBy: { checkedAt: 'asc' },
+      }),
+      app.db.weightRecord.findMany({
+        where: {
+          userId: request.user.userId,
+          measuredAt: { gte: start, lt: end },
+        },
+        orderBy: [{ measuredAt: 'asc' }, { id: 'asc' }],
+      }),
+    ])
+    if (!user) {
+      const error = new Error('User not found') as Error & { statusCode: number }
+      error.statusCode = 401
+      throw error
+    }
+
+    return ok(
+      buildMonthlyReport({
+        month: query.month,
+        checkIns,
+        weightRecords,
+        weightUnit: user.weightUnit || 'kg',
+      }),
+    )
   })
 
   app.get('/api/weights', async (request) => {

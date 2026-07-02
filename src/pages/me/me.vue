@@ -4,6 +4,8 @@ import type { GoalMode, GoalPeriod } from '@/api/types/login'
 import type { ThemeMode } from '@/store'
 import { getAchievements } from '@/api/achievements'
 import { updateUserProfile, uploadUserAvatar } from '@/api/login'
+import type { MonthlyReport } from '@/api/monthly-reports'
+import { getMonthlyReport } from '@/api/monthly-reports'
 import AchievementUnlockSheet from '@/components/achievement-unlock-sheet/achievement-unlock-sheet.vue'
 import { useAchievementUnlockFeedback } from '@/composables/useAchievementUnlockFeedback'
 import { useThemeStore, useTokenStore, useUserStore } from '@/store'
@@ -13,6 +15,7 @@ import {
   getAchievementTotals,
 } from '@/utils/achievement-progress'
 import { triggerSuccessHaptic } from '@/utils/haptics'
+import { fromWeightKg } from '@/utils/weight'
 
 definePage({
   style: {
@@ -35,6 +38,7 @@ const profileReady = ref(false)
 const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
 const achievements = ref<AchievementSeriesProgress[]>([])
+const monthlyReport = ref<MonthlyReport | null>(null)
 const selectedAchievementCategory = ref<AchievementCategory>('checkin')
 const selectedAchievementSeries = ref<AchievementSeriesProgress | null>(null)
 const genderOptions = [
@@ -110,6 +114,44 @@ const achievementTotals = computed(() => getAchievementTotals(achievements.value
 const achievementProgressText = computed(() => achievementTotals.value.text)
 const completionPercent = computed(() => achievementTotals.value.percent)
 const profileAccent = computed(() => (form.gender === 'male' ? 'blue' : 'pink'))
+const currentReportMonth = computed(() => getMonthKey(new Date()))
+const monthlyReportTitle = computed(() => {
+  const [year, month] = currentReportMonth.value.split('-')
+  return `${year}年${Number(month)}月报`
+})
+const monthlyCheckinDays = computed(() => monthlyReport.value?.checkin.days || 0)
+const monthlyCheckinCount = computed(() => monthlyReport.value?.checkin.count || 0)
+const monthlyWeightRecordCount = computed(() => monthlyReport.value?.weight.recordCount || 0)
+const monthlyDurationText = computed(() => formatDuration(monthlyReport.value?.checkin.durationMinutes || 0))
+const monthlyWeightChangeText = computed(() => {
+  const report = monthlyReport.value
+  if (!report || report.weight.changeKg === null) {
+    return '待记录'
+  }
+  const value = fromWeightKg(Math.abs(report.weight.changeKg), report.weight.weightUnit).toFixed(1)
+  const sign = report.weight.changeKg > 0 ? '+' : report.weight.changeKg < 0 ? '-' : ''
+  return `${sign}${value} ${report.weight.weightUnit === 'jin' ? '斤' : 'kg'}`
+})
+const monthlyReportSummary = computed(() => {
+  const report = monthlyReport.value
+  if (!report || (report.checkin.days === 0 && report.weight.recordCount === 0)) {
+    return '本月还没有足够数据，完成打卡或记录体重后自动生成总结'
+  }
+  const checkinText =
+    report.checkin.days > 0
+      ? `已运动 ${report.checkin.days} 天，累计 ${formatDuration(report.checkin.durationMinutes)}`
+      : '本月还未打卡'
+  const weightText =
+    report.weight.changeKg === null ? '体重变化待记录' : `体重变化 ${monthlyWeightChangeText.value}`
+  return `${checkinText} · ${weightText}`
+})
+const monthlyWeightChangeTone = computed(() => {
+  const change = monthlyReport.value?.weight.changeKg
+  if (change === null || change === undefined || change === 0) {
+    return 'neutral'
+  }
+  return change < 0 ? 'down' : 'up'
+})
 const achievementCategoryOptions = computed(() => getAchievementCategoryOptions(achievements.value))
 const filteredAchievementSeries = computed(() =>
   filterAchievementSeries(achievements.value, selectedAchievementCategory.value),
@@ -163,7 +205,11 @@ async function initProfile() {
   } else {
     await userStore.fetchUserInfo()
   }
-  const [userInfo, nextAchievements] = [userStore.userInfo, await getAchievements()]
+  const [nextAchievements, nextMonthlyReport] = await Promise.all([
+    getAchievements(),
+    getMonthlyReport(currentReportMonth.value),
+  ])
+  const userInfo = userStore.userInfo
   form.nickname = userInfo.nickname || ''
   form.avatarUrl = userInfo.avatarUrl || userInfo.avatar || ''
   form.gender = userInfo.gender || ''
@@ -175,6 +221,7 @@ async function initProfile() {
   form.goalDuration = userInfo.goalDuration || rule.defaultDuration
   form.heightCm = userInfo.heightCm ? String(userInfo.heightCm) : ''
   achievements.value = nextAchievements
+  monthlyReport.value = nextMonthlyReport
   await syncAchievementUnlocks(false, nextAchievements)
   profileReady.value = true
 }
@@ -195,6 +242,20 @@ function selectTheme(mode: ThemeMode) {
   }
   themeStore.setMode(mode)
   triggerSuccessHaptic()
+}
+
+function getMonthKey(date: Date) {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  return `${date.getFullYear()}-${month}`
+}
+
+function formatDuration(minutes: number) {
+  if (minutes < 60) {
+    return `${minutes} 分钟`
+  }
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`
 }
 
 function formatGoalSummary(period: GoalPeriod, mode: GoalMode, countGoal: number, durationGoal: number) {
@@ -579,6 +640,44 @@ async function saveProfile() {
       </app-card>
     </view>
 
+    <text class="ios-section-title">月报</text>
+    <view class="monthly-report-shell">
+      <app-card accent="green" elevated>
+        <view class="monthly-report-card">
+          <view class="monthly-report-head">
+            <view>
+              <text class="monthly-report-title">{{ monthlyReportTitle }}</text>
+              <text class="monthly-report-summary">{{ monthlyReportSummary }}</text>
+            </view>
+            <app-icon name="badge" accent="green" size="lg" active />
+          </view>
+
+          <view class="monthly-report-grid">
+            <view class="monthly-report-metric">
+              <app-icon name="checkin" accent="green" size="sm" />
+              <text class="report-metric-label">打卡天数</text>
+              <text class="report-metric-value numeric">{{ monthlyCheckinDays }} 天</text>
+              <text class="report-metric-note numeric">共 {{ monthlyCheckinCount }} 次</text>
+            </view>
+            <view class="monthly-report-metric">
+              <app-icon name="i-carbon-time" accent="orange" size="sm" />
+              <text class="report-metric-label">运动时长</text>
+              <text class="report-metric-value numeric">{{ monthlyDurationText }}</text>
+              <text class="report-metric-note">本月累计</text>
+            </view>
+            <view class="monthly-report-metric">
+              <app-icon name="weight" accent="blue" size="sm" />
+              <text class="report-metric-label">体重变化</text>
+              <text class="report-metric-value numeric" :class="`tone-${monthlyWeightChangeTone}`">
+                {{ monthlyWeightChangeText }}
+              </text>
+              <text class="report-metric-note numeric">记录 {{ monthlyWeightRecordCount }} 次</text>
+            </view>
+          </view>
+        </view>
+      </app-card>
+    </view>
+
     <view class="achievement-heading">
       <text class="ios-section-title achievement-section-title">我的成就</text>
       <text class="achievement-count numeric">{{ achievementProgressText }}</text>
@@ -789,6 +888,7 @@ async function saveProfile() {
 .profile-summary-shell,
 .form-section-shell,
 .appearance-card-shell,
+.monthly-report-shell,
 .achievement-filter-shell,
 .series-grid {
   margin-right: var(--app-gutter);
@@ -921,6 +1021,104 @@ async function saveProfile() {
   flex: 0 0 auto;
   transform: scale(0.78);
   transform-origin: center right;
+}
+
+.monthly-report-card {
+  position: relative;
+  padding: 30rpx;
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: app-enter var(--app-motion-normal) 80ms var(--app-ease-out) both;
+}
+
+.monthly-report-card::before {
+  position: absolute;
+  top: -110rpx;
+  right: -72rpx;
+  width: 250rpx;
+  height: 250rpx;
+  border-radius: 50%;
+  background: var(--app-green-soft);
+  content: '';
+}
+
+.monthly-report-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22rpx;
+}
+
+.monthly-report-title,
+.monthly-report-summary,
+.report-metric-label,
+.report-metric-value,
+.report-metric-note {
+  display: block;
+}
+
+.monthly-report-title {
+  color: var(--app-label-primary);
+  font-size: 34rpx;
+  font-weight: 840;
+  line-height: 1.18;
+}
+
+.monthly-report-summary {
+  margin-top: 10rpx;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+  font-weight: 620;
+  line-height: 1.42;
+}
+
+.monthly-report-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14rpx;
+  margin-top: 26rpx;
+}
+
+.monthly-report-metric {
+  min-width: 0;
+  padding: 18rpx 14rpx;
+  border: 1rpx solid var(--app-separator);
+  border-radius: 22rpx;
+  background: var(--app-fill);
+  box-sizing: border-box;
+}
+
+.report-metric-label {
+  margin-top: 12rpx;
+  color: var(--app-label-secondary);
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.report-metric-value {
+  margin-top: 8rpx;
+  color: var(--app-label-primary);
+  font-size: 25rpx;
+  font-weight: 840;
+  line-height: 1.22;
+}
+
+.report-metric-value.tone-down {
+  color: var(--app-green);
+}
+
+.report-metric-value.tone-up {
+  color: var(--app-orange);
+}
+
+.report-metric-note {
+  margin-top: 6rpx;
+  color: var(--app-label-tertiary);
+  font-size: 18rpx;
+  font-weight: 650;
+  line-height: 1.25;
 }
 
 .form-section-content {
