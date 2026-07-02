@@ -39,6 +39,7 @@ const uploadingAvatar = ref(false)
 const avatarTempUrl = ref('')
 const achievements = ref<AchievementSeriesProgress[]>([])
 const monthlyReport = ref<MonthlyReport | null>(null)
+const profileDetailsExpanded = ref(false)
 const selectedAchievementCategory = ref<AchievementCategory>('checkin')
 const selectedAchievementSeries = ref<AchievementSeriesProgress | null>(null)
 const genderOptions = [
@@ -116,6 +117,11 @@ const completionPercent = computed(() => achievementTotals.value.percent)
 const profileAccent = computed(() => (form.gender === 'female' ? 'pink' : 'blue'))
 const genderFieldIcon = computed(() => (form.gender === 'female' ? 'i-carbon-gender-female' : 'i-carbon-gender-male'))
 const genderFieldAccent = computed(() => (form.gender === 'female' ? 'pink' : 'blue'))
+const profileBriefText = computed(() => {
+  const birthday = form.birthday || '生日未设置'
+  const height = form.heightCm ? `${form.heightCm} cm` : '身高未设置'
+  return `${genderLabel.value} · ${birthday} · ${height}`
+})
 const currentReportMonth = computed(() => getMonthKey(new Date()))
 const monthlyReportTitle = computed(() => {
   const [year, month] = currentReportMonth.value.split('-')
@@ -576,7 +582,21 @@ async function saveProfile() {
     <text class="ios-section-title">个人资料</text>
     <view class="form-section-shell">
       <app-card accent="blue">
-        <view class="form-section-content">
+        <button
+          class="profile-folder-button"
+          hover-class="profile-folder-pressed"
+          @click="profileDetailsExpanded = !profileDetailsExpanded"
+        >
+          <app-icon name="profile" accent="blue" size="md" active />
+          <view class="profile-folder-copy">
+            <text class="profile-folder-title">资料信息</text>
+            <text class="profile-folder-desc">{{ profileBriefText }}</text>
+          </view>
+          <text class="profile-folder-action">{{ profileDetailsExpanded ? '收起' : '编辑' }}</text>
+          <text class="profile-folder-chevron i-carbon-chevron-down" :class="{ expanded: profileDetailsExpanded }" />
+        </button>
+
+        <view v-if="profileDetailsExpanded" class="form-section-content">
           <view class="field">
             <app-icon name="profile" accent="blue" size="sm" />
             <text class="field-label">昵称</text>
@@ -1192,7 +1212,80 @@ async function saveProfile() {
   line-height: 1.25;
 }
 
+.profile-folder-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 116rpx;
+  padding: 24rpx 28rpx;
+  border-radius: var(--app-card-radius);
+  color: var(--app-label-primary);
+  background: transparent;
+  text-align: left;
+  line-height: normal;
+  box-sizing: border-box;
+  animation: app-enter var(--app-motion-normal) 50ms var(--app-ease-out) both;
+}
+
+.profile-folder-button::after {
+  border: 0;
+}
+
+.profile-folder-pressed {
+  opacity: 0.82;
+  transform: scale(0.985);
+}
+
+.profile-folder-copy {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.profile-folder-title,
+.profile-folder-desc {
+  display: block;
+}
+
+.profile-folder-title {
+  color: var(--app-label-primary);
+  font-size: 29rpx;
+  font-weight: 780;
+}
+
+.profile-folder-desc {
+  margin-top: 6rpx;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.profile-folder-action {
+  flex: 0 0 auto;
+  margin-left: 16rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  color: var(--app-blue);
+  background: var(--app-blue-soft);
+  font-size: 22rpx;
+  font-weight: 780;
+}
+
+.profile-folder-chevron {
+  flex: 0 0 auto;
+  margin-left: 8rpx;
+  color: var(--app-label-tertiary);
+  font-size: 28rpx;
+  transition: transform var(--app-motion-fast) var(--app-ease-out);
+}
+
+.profile-folder-chevron.expanded {
+  transform: rotate(180deg);
+}
+
 .form-section-content {
+  border-top: 1rpx solid var(--app-separator);
   overflow: hidden;
   animation: app-enter var(--app-motion-normal) 50ms var(--app-ease-out) both;
 }
