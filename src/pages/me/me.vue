@@ -113,7 +113,9 @@ const genderLabel = computed(() => genderOptions[genderIndex.value].label)
 const achievementTotals = computed(() => getAchievementTotals(achievements.value))
 const achievementProgressText = computed(() => achievementTotals.value.text)
 const completionPercent = computed(() => achievementTotals.value.percent)
-const profileAccent = computed(() => (form.gender === 'male' ? 'blue' : 'pink'))
+const profileAccent = computed(() => (form.gender === 'female' ? 'pink' : 'blue'))
+const genderFieldIcon = computed(() => (form.gender === 'female' ? 'i-carbon-gender-female' : 'i-carbon-gender-male'))
+const genderFieldAccent = computed(() => (form.gender === 'female' ? 'pink' : 'blue'))
 const currentReportMonth = computed(() => getMonthKey(new Date()))
 const monthlyReportTitle = computed(() => {
   const [year, month] = currentReportMonth.value.split('-')
@@ -543,8 +545,8 @@ async function saveProfile() {
                 <text class="stat-value numeric">{{ achievementProgressText }}</text>
               </view>
               <view class="profile-stat">
-                <text class="stat-label">目标设置</text>
-                <text class="stat-value numeric">{{ goalSummary }}</text>
+                <text class="stat-label">本月运动</text>
+                <text class="stat-value numeric">{{ monthlyCheckinDays }} 天</text>
               </view>
             </view>
           </view>
@@ -553,6 +555,21 @@ async function saveProfile() {
             <progress-ring :percent="completionPercent" label="成就" :accent="profileAccent" />
           </view>
         </view>
+      </app-card>
+    </view>
+
+    <text class="ios-section-title">目标</text>
+    <view class="goal-card-shell">
+      <app-card accent="green">
+        <button class="goal-card-button" hover-class="goal-card-pressed" @click="openGoalSettingsSheet">
+          <app-icon name="target" accent="green" size="md" active />
+          <view class="goal-card-copy">
+            <text class="goal-card-title">目标设置</text>
+            <text class="goal-card-desc">{{ goalSummary }}</text>
+          </view>
+          <text class="goal-card-action">调整</text>
+          <text class="field-chevron i-carbon-chevron-right" />
+        </button>
       </app-card>
     </view>
 
@@ -577,7 +594,7 @@ async function saveProfile() {
 
           <picker :value="genderIndex" :range="genderOptions" range-key="label" @change="handleGenderChange">
             <view class="field picker-field">
-              <app-icon name="i-carbon-gender-male" accent="pink" size="sm" />
+              <app-icon :name="genderFieldIcon" :accent="genderFieldAccent" size="sm" />
               <text class="field-label">性别</text>
               <view class="field-value">
                 {{ genderLabel }}
@@ -596,13 +613,6 @@ async function saveProfile() {
               <text class="field-chevron i-carbon-chevron-right" />
             </view>
           </picker>
-
-          <button class="field picker-field goal-field-button" hover-class="goal-field-pressed" @click="openGoalSettingsSheet">
-            <app-icon name="target" accent="green" size="sm" />
-            <text class="field-label">目标设置</text>
-            <view class="field-value"> {{ goalSummary }} </view>
-            <text class="field-chevron i-carbon-chevron-right" />
-          </button>
 
           <view class="field">
             <app-icon name="i-carbon-ruler" accent="gold" size="sm" />
@@ -886,6 +896,7 @@ async function saveProfile() {
 }
 
 .profile-summary-shell,
+.goal-card-shell,
 .form-section-shell,
 .appearance-card-shell,
 .monthly-report-shell,
@@ -1023,6 +1034,66 @@ async function saveProfile() {
   transform-origin: center right;
 }
 
+.goal-card-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 116rpx;
+  padding: 24rpx 28rpx;
+  border-radius: var(--app-card-radius);
+  color: var(--app-label-primary);
+  background: transparent;
+  text-align: left;
+  line-height: normal;
+  box-sizing: border-box;
+  animation: app-enter var(--app-motion-normal) 35ms var(--app-ease-out) both;
+}
+
+.goal-card-button::after {
+  border: 0;
+}
+
+.goal-card-pressed {
+  opacity: 0.82;
+  transform: scale(0.985);
+}
+
+.goal-card-copy {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.goal-card-title,
+.goal-card-desc {
+  display: block;
+}
+
+.goal-card-title {
+  color: var(--app-label-primary);
+  font-size: 29rpx;
+  font-weight: 780;
+}
+
+.goal-card-desc {
+  margin-top: 6rpx;
+  color: var(--app-label-secondary);
+  font-size: 23rpx;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.goal-card-action {
+  flex: 0 0 auto;
+  margin-left: 16rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  color: var(--app-green);
+  background: var(--app-green-soft);
+  font-size: 22rpx;
+  font-weight: 780;
+}
+
 .monthly-report-card {
   position: relative;
   padding: 30rpx;
@@ -1138,21 +1209,6 @@ async function saveProfile() {
 
 .field:last-child {
   border-bottom: 0;
-}
-
-.goal-field-button {
-  width: auto;
-  text-align: left;
-  background: transparent;
-  line-height: normal;
-}
-
-.goal-field-button::after {
-  border: 0;
-}
-
-.goal-field-pressed {
-  opacity: 0.76;
 }
 
 .field-chevron {
